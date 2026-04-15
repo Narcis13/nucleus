@@ -1,0 +1,17 @@
+# Supabase local dev config. Run `supabase init` to generate a full file.
+project_id = "core-pro"
+
+[api]
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
