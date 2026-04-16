@@ -10,9 +10,11 @@ import { ContactSection } from "@/components/micro-site/contact-section"
 import { FaqSection } from "@/components/micro-site/faq-section"
 import { MicroSiteFooter } from "@/components/micro-site/footer"
 import { HeroSection } from "@/components/micro-site/hero-section"
+import { LeadMagnetsSection } from "@/components/micro-site/lead-magnets-section"
 import { ServicesSection } from "@/components/micro-site/services-section"
 import { TestimonialsSection } from "@/components/micro-site/testimonials-section"
 import { resolveTheme } from "@/components/micro-site/theme"
+import { listPublicLeadMagnets } from "@/lib/db/queries/marketing"
 import {
   getPublicMicroSite,
   listPublishedSlugs,
@@ -107,6 +109,8 @@ export default async function MicroSitePage({
   const site = await getPublicMicroSite(slug)
   if (!site) notFound()
 
+  const leadMagnets = await listPublicLeadMagnets(site.professional.id)
+
   const { style } = resolveTheme(site.theme, site.sections.branding)
 
   const url = absoluteUrl(`/${slug}`)
@@ -180,6 +184,9 @@ export default async function MicroSitePage({
         if (!render) return null
         return <div key={sectionType}>{render()}</div>
       })}
+      {leadMagnets.length > 0 && (
+        <LeadMagnetsSection magnets={leadMagnets} slug={slug} />
+      )}
       <MicroSiteFooter
         professional={site.professional}
         socialLinks={site.socialLinks}

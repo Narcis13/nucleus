@@ -1,18 +1,50 @@
-import { Megaphone } from "lucide-react"
+import { asc } from "drizzle-orm"
+import { redirect } from "next/navigation"
 
-import { EmptyState, PageHeader } from "@/components/shared/page-header"
+import { MarketingWorkspace } from "@/components/dashboard/marketing/marketing-workspace"
+import { PageHeader } from "@/components/shared/page-header"
+import { withRLS } from "@/lib/db/rls"
+import {
+  listEmailCampaigns,
+  listLeadMagnets,
+  listSocialTemplates,
+} from "@/lib/db/queries/marketing"
+import { getProfessional } from "@/lib/db/queries/professionals"
+import { tags } from "@/lib/db/schema"
 
-export default function MarketingKitPage() {
+export default async function MarketingKitPage() {
+  const professional = await getProfessional()
+  if (!professional) redirect("/onboarding")
+
+  const [campaigns, templates, magnets, tagRows] = await Promise.all([
+    listEmailCampaigns(),
+    listSocialTemplates(),
+    listLeadMagnets(),
+    withRLS((tx) =>
+      tx
+        .select({ id: tags.id, name: tags.name, color: tags.color })
+        .from(tags)
+        .orderBy(asc(tags.name)),
+    ),
+  ])
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Marketing"
-        description="Assets, templates, and campaigns to grow your book of business."
+        description="Email campaigns, shareable social graphics, and gated lead magnets — all in one place."
       />
-      <EmptyState
-        icon={<Megaphone />}
-        title="Marketing kit coming soon"
-        description="Email templates, shareable graphics, and referral tracking arrive later."
+      <MarketingWorkspace
+        campaigns={campaigns}
+        socialTemplates={templates}
+        leadMagnets={magnets}
+        professionalName={professional.fullName}
+        professionalBrand={{
+          primary: (professional.branding as { primary_color?: string } | null)?.primary_color ?? "#6366f1",
+          secondary: (professional.branding as { secondary_color?: string } | null)?.secondary_color ?? "#f59e0b",
+        }}
+        tags={tagRows}
+        plan={professional.plan}
       />
     </div>
   )

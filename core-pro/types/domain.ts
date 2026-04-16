@@ -14,12 +14,16 @@ import type {
   clients,
   conversations,
   documents,
+  emailCampaignRecipients,
+  emailCampaigns,
   formAssignments,
   formResponses,
   forms,
   invoiceSettings,
   invoices,
   leadActivities,
+  leadMagnetDownloads,
+  leadMagnets,
   leadStages,
   leads,
   marketingAssets,
@@ -32,6 +36,7 @@ import type {
   professionals,
   pushSubscriptions,
   services,
+  socialTemplates,
   tags,
 } from "@/lib/db/schema"
 
@@ -106,6 +111,46 @@ export type Automation = InferSelectModel<typeof automations>
 export type AutomationLog = InferSelectModel<typeof automationLogs>
 export type MicroSite = InferSelectModel<typeof microSites>
 export type MarketingAsset = InferSelectModel<typeof marketingAssets>
+
+// ── Marketing kit (session 17) ─────────────────────────────────────────────
+export type EmailCampaign = InferSelectModel<typeof emailCampaigns>
+export type NewEmailCampaign = InferInsertModel<typeof emailCampaigns>
+export type EmailCampaignRecipient = InferSelectModel<
+  typeof emailCampaignRecipients
+>
+export type NewEmailCampaignRecipient = InferInsertModel<
+  typeof emailCampaignRecipients
+>
+export type SocialTemplate = InferSelectModel<typeof socialTemplates>
+export type NewSocialTemplate = InferInsertModel<typeof socialTemplates>
+export type LeadMagnet = InferSelectModel<typeof leadMagnets>
+export type NewLeadMagnet = InferInsertModel<typeof leadMagnets>
+export type LeadMagnetDownload = InferSelectModel<typeof leadMagnetDownloads>
+
+// Audience descriptor persisted on `email_campaigns.audience`.
+export type EmailCampaignAudience =
+  | { type: "all_clients" }
+  | { type: "tag"; tagId: string }
+  | { type: "status"; status: string }
+  | { type: "leads_all" }
+
+// Shape of the hashtags JSON column on social_templates.
+export type SocialTemplateHashtags = string[]
+
+// Shape of `social_templates.design` — loose on purpose; the editor adds
+// fields over time without needing a migration.
+export type SocialTemplateDesign = {
+  title?: string
+  body?: string
+  cta?: string
+  author?: string
+  primaryColor?: string
+  secondaryColor?: string
+  textColor?: string
+  backgroundStyle?: "solid" | "gradient"
+  logoUrl?: string | null
+}
+
 export type Notification = InferSelectModel<typeof notifications>
 export type NewNotification = InferInsertModel<typeof notifications>
 export type PushSubscription = InferSelectModel<typeof pushSubscriptions>
