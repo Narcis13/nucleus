@@ -10,6 +10,9 @@ export const env = createEnv({
     // ── Supabase ──
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
     DATABASE_URL: z.string().url().optional(),
+    // Optional separate connection for service-role / migration usage.
+    // Falls back to DATABASE_URL when unset.
+    DATABASE_URL_SERVICE_ROLE: z.string().url().optional(),
 
     // ── Stripe ──
     STRIPE_SECRET_KEY: z.string().min(1),
@@ -79,6 +82,7 @@ export const env = createEnv({
     CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_URL_SERVICE_ROLE: process.env.DATABASE_URL_SERVICE_ROLE,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     STRIPE_STARTER_PRICE_ID: process.env.STRIPE_STARTER_PRICE_ID,

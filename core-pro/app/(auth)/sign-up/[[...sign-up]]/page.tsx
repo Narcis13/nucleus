@@ -1,3 +1,5 @@
+import { SignUp } from "@clerk/nextjs"
+
 export default function SignUpPage() {
-  return <div>TODO: Clerk SignUp</div>
+  return <SignUp />
 }
