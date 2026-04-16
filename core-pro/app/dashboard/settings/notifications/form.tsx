@@ -52,6 +52,14 @@ const TYPE_COPY: Record<NotificationType, { title: string; hint: string }> = {
     title: "Invoices",
     hint: "Payments, overdues, and reminders you send.",
   },
+  invoice_reminder: {
+    title: "Invoice reminders",
+    hint: "Dunning emails when an invoice goes overdue.",
+  },
+  invoice_paid: {
+    title: "Payment receipts",
+    hint: "Confirmations when an invoice is fully paid.",
+  },
   document: {
     title: "Documents",
     hint: "Uploads by clients to their document vault.",

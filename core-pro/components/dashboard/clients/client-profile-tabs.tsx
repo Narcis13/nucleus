@@ -232,11 +232,11 @@ export function ClientProfileTabs({
                 <div>
                   <p className="text-sm font-medium">{inv.invoiceNumber}</p>
                   <p className="text-xs text-muted-foreground">
-                    {inv.amount} {inv.currency} · {inv.status}
+                    {inv.total} {inv.currency} · {inv.status}
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(inv.issuedAt).toLocaleDateString()}
+                  {new Date(inv.issueDate).toLocaleDateString()}
                 </p>
               </li>
             ))}

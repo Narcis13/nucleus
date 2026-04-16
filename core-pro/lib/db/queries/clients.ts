@@ -360,7 +360,7 @@ export async function getClientActivity(
           id: invoices.id,
           invoiceNumber: invoices.invoiceNumber,
           status: invoices.status,
-          amount: invoices.amount,
+          total: invoices.total,
           currency: invoices.currency,
           createdAt: invoices.createdAt,
         })
@@ -427,7 +427,7 @@ export async function getClientActivity(
         id: `inv:${i.id}`,
         type: "invoice",
         title: `Invoice ${i.invoiceNumber} · ${i.status}`,
-        description: `${i.amount} ${i.currency}`,
+        description: `${i.total} ${i.currency}`,
         occurredAt: i.createdAt,
       })),
       ...formRows.map<ActivityEntry>((f) => ({
