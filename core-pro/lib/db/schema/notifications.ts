@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core"
 import { authenticatedRole } from "drizzle-orm/supabase"
@@ -52,6 +53,57 @@ export const notifications = pgTable(
         (${t.userType} = 'client' and ${t.userId} in (select id from public.clients where clerk_user_id = ${currentClerkUserId}))
       `,
       withCheck: sql`
+        (${t.userType} = 'professional' and ${t.userId} in (select id from public.professionals where clerk_user_id = ${currentClerkUserId}))
+        or
+        (${t.userType} = 'client' and ${t.userId} in (select id from public.clients where clerk_user_id = ${currentClerkUserId}))
+      `,
+    }),
+  ],
+)
+
+// ============================================================================
+// PUSH_SUBSCRIPTIONS — per-device Web Push endpoint for a user (professional or
+// client). `endpoint` is globally unique across the browser vendor network, so
+// we use it as the conflict target when a browser re-subscribes.
+// ============================================================================
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    userType: text("user_type").notNull(), // 'professional' | 'client'
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("push_subscriptions_endpoint_unique").on(t.endpoint),
+    index("push_subscriptions_user_idx").on(t.userType, t.userId),
+
+    pgPolicy("push_subscriptions_owner_select", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`
+        (${t.userType} = 'professional' and ${t.userId} in (select id from public.professionals where clerk_user_id = ${currentClerkUserId}))
+        or
+        (${t.userType} = 'client' and ${t.userId} in (select id from public.clients where clerk_user_id = ${currentClerkUserId}))
+      `,
+    }),
+    pgPolicy("push_subscriptions_owner_insert", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`
+        (${t.userType} = 'professional' and ${t.userId} in (select id from public.professionals where clerk_user_id = ${currentClerkUserId}))
+        or
+        (${t.userType} = 'client' and ${t.userId} in (select id from public.clients where clerk_user_id = ${currentClerkUserId}))
+      `,
+    }),
+    pgPolicy("push_subscriptions_owner_delete", {
+      for: "delete",
+      to: authenticatedRole,
+      using: sql`
         (${t.userType} = 'professional' and ${t.userId} in (select id from public.professionals where clerk_user_id = ${currentClerkUserId}))
         or
         (${t.userType} = 'client' and ${t.userId} in (select id from public.clients where clerk_user_id = ${currentClerkUserId}))

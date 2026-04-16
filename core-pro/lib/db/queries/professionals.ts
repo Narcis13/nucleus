@@ -3,6 +3,7 @@ import "server-only"
 import { auth } from "@clerk/nextjs/server"
 import { eq } from "drizzle-orm"
 
+import { dbAdmin } from "@/lib/db/client"
 import { withRLS } from "@/lib/db/rls"
 import { microSites, professionals } from "@/lib/db/schema"
 import type { Professional } from "@/types/domain"
@@ -38,6 +39,36 @@ export async function updateProfessional(
       .returning()
     return rows[0] ?? null
   })
+}
+
+// Resolves the professional whose workspace the currently-signed-in *client*
+// belongs to. Clients are invited as Clerk org members, so the active orgId
+// on the session is the professional's workspace.
+//
+// Uses `dbAdmin` because the RLS policies on `professionals` only permit the
+// professional themselves to SELECT their own row — a client in the same org
+// can't see it otherwise. We return a narrow branding-shaped projection so no
+// sensitive columns (stripe ids, billing, etc.) leak through this path even
+// if callers grow careless with it.
+export async function getProfessionalForClientPortal(): Promise<{
+  id: string
+  fullName: string
+  avatarUrl: string | null
+  branding: Professional["branding"]
+} | null> {
+  const { orgId } = await auth()
+  if (!orgId) return null
+  const rows = await dbAdmin
+    .select({
+      id: professionals.id,
+      fullName: professionals.fullName,
+      avatarUrl: professionals.avatarUrl,
+      branding: professionals.branding,
+    })
+    .from(professionals)
+    .where(eq(professionals.clerkOrgId, orgId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 // Public lookup used by the micro-site routes ([slug]/...). Goes through

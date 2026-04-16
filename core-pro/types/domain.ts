@@ -9,6 +9,7 @@ import type {
   automationLogs,
   automations,
   availabilitySlots,
+  clientSettings,
   clientTags,
   clients,
   conversations,
@@ -27,6 +28,7 @@ import type {
   professionalClients,
   professionalSettings,
   professionals,
+  pushSubscriptions,
   services,
   tags,
 } from "@/lib/db/schema"
@@ -75,7 +77,11 @@ export type AutomationLog = InferSelectModel<typeof automationLogs>
 export type MicroSite = InferSelectModel<typeof microSites>
 export type MarketingAsset = InferSelectModel<typeof marketingAssets>
 export type Notification = InferSelectModel<typeof notifications>
+export type NewNotification = InferInsertModel<typeof notifications>
+export type PushSubscription = InferSelectModel<typeof pushSubscriptions>
+export type NewPushSubscription = InferInsertModel<typeof pushSubscriptions>
 export type ProfessionalSettings = InferSelectModel<typeof professionalSettings>
+export type ClientSettings = InferSelectModel<typeof clientSettings>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Composed view types — used in lists/details where we want the linked row.
@@ -112,3 +118,32 @@ export type Branding = {
 }
 
 export type UserRole = "professional" | "client" | "admin"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification preferences — stored on *_settings.notification_preferences.
+// `per_type` and `per_channel` booleans are `true` by default when missing, so
+// adding a new notification type doesn't silently suppress it for existing
+// users. Quiet hours are interpreted in the recipient's timezone.
+// ─────────────────────────────────────────────────────────────────────────────
+export type NotificationType =
+  | "message"
+  | "appointment"
+  | "form"
+  | "lead"
+  | "invoice"
+  | "document"
+  | "system"
+
+export type NotificationChannel = "in_app" | "email" | "push"
+
+export type QuietHours = {
+  enabled: boolean
+  start: string // "HH:MM" local time
+  end: string // "HH:MM" local time
+}
+
+export type NotificationPreferences = {
+  per_type?: Partial<Record<NotificationType, boolean>>
+  per_channel?: Partial<Record<NotificationChannel, boolean>>
+  quiet_hours?: QuietHours
+}

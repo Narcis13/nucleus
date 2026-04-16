@@ -43,6 +43,14 @@ export const env = createEnv({
     GOOGLE_CALENDAR_CLIENT_ID: z.string().optional(),
     GOOGLE_CALENDAR_CLIENT_SECRET: z.string().optional(),
 
+    // ── Web Push (optional) ──
+    // Generate a VAPID keypair with: `npx web-push generate-vapid-keys`.
+    // When unset, push delivery is skipped but the rest of the notification
+    // pipeline (in-app, email) continues to work.
+    VAPID_PUBLIC_KEY: z.string().optional(),
+    VAPID_PRIVATE_KEY: z.string().optional(),
+    VAPID_SUBJECT: z.string().optional(),
+
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -100,6 +108,9 @@ export const env = createEnv({
     UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
     GOOGLE_CALENDAR_CLIENT_ID: process.env.GOOGLE_CALENDAR_CLIENT_ID,
     GOOGLE_CALENDAR_CLIENT_SECRET: process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
+    VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+    VAPID_SUBJECT: process.env.VAPID_SUBJECT,
     NODE_ENV: process.env.NODE_ENV,
     // client
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
