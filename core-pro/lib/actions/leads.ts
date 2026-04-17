@@ -7,6 +7,7 @@ import {
   ActionError,
   authedAction,
 } from "@/lib/actions/safe-action"
+import { evaluateTrigger } from "@/lib/automations/engine"
 import {
   addLeadActivity as addLeadActivityQuery,
   convertLeadToClient as convertLeadToClientQuery,
@@ -124,6 +125,14 @@ export const createLeadAction = authedAction
       phone: parsedInput.phone || null,
       source: parsedInput.source || null,
     })
+
+    // Fire automations keyed on `new_lead` — best-effort, never blocks the
+    // authoring response if Trigger.dev / the engine chokes.
+    void evaluateTrigger("new_lead", {
+      type: "new_lead",
+      professionalId: professional.id,
+      leadId: created.id,
+    }).catch(() => {})
 
     revalidatePath("/dashboard/leads")
     return { id: created.id, stageId }

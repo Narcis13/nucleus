@@ -127,4 +127,19 @@
   html {
     @apply font-sans;
   }
+
+  @media print {
+    /* Hide app chrome so "Save as PDF" from the analytics page yields a clean
+       report. Any element marked `print:hidden` via Tailwind also disappears. */
+    aside, nav, [data-slot="topbar"], header[data-slot="dashboard-topbar"] {
+      display: none !important;
+    }
+    body {
+      background: white !important;
+    }
+    [data-print-root] {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+  }
 }

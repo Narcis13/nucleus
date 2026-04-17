@@ -9,6 +9,7 @@ import {
   ActionError,
   authedAction,
 } from "@/lib/actions/safe-action"
+import { evaluateTrigger } from "@/lib/automations/engine"
 import {
   addTagToClient as addTagToClientQuery,
   addTagToClients as addTagToClientsQuery,
@@ -153,6 +154,12 @@ export const createClientAction = authedAction
         // Swallow; surfaced via `invited: false` in the response.
       }
     }
+
+    void evaluateTrigger("new_client", {
+      type: "new_client",
+      professionalId: professional.id,
+      clientId: created.id,
+    }).catch(() => {})
 
     revalidatePath("/dashboard/clients")
     return { id: created.id, invited }

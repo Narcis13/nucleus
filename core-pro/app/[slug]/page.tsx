@@ -7,6 +7,7 @@ import {
   NichePlaceholderSection,
 } from "@/components/micro-site/blog-section"
 import { ContactSection } from "@/components/micro-site/contact-section"
+import { CookieBanner } from "@/components/micro-site/cookie-banner"
 import { FaqSection } from "@/components/micro-site/faq-section"
 import { MicroSiteFooter } from "@/components/micro-site/footer"
 import { HeroSection } from "@/components/micro-site/hero-section"
@@ -14,6 +15,7 @@ import { LeadMagnetsSection } from "@/components/micro-site/lead-magnets-section
 import { ServicesSection } from "@/components/micro-site/services-section"
 import { TestimonialsSection } from "@/components/micro-site/testimonials-section"
 import { resolveTheme } from "@/components/micro-site/theme"
+import { getProfessionalPrivacyPolicyUrl } from "@/lib/db/queries/professionals"
 import { listPublicLeadMagnets } from "@/lib/db/queries/marketing"
 import {
   getPublicMicroSite,
@@ -109,7 +111,10 @@ export default async function MicroSitePage({
   const site = await getPublicMicroSite(slug)
   if (!site) notFound()
 
-  const leadMagnets = await listPublicLeadMagnets(site.professional.id)
+  const [leadMagnets, privacyPolicyUrl] = await Promise.all([
+    listPublicLeadMagnets(site.professional.id),
+    getProfessionalPrivacyPolicyUrl(site.professional.id),
+  ])
 
   const { style } = resolveTheme(site.theme, site.sections.branding)
 
@@ -191,6 +196,7 @@ export default async function MicroSitePage({
         professional={site.professional}
         socialLinks={site.socialLinks}
       />
+      <CookieBanner privacyPolicyUrl={privacyPolicyUrl} />
     </div>
   )
 }

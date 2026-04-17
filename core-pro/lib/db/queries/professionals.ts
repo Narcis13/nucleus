@@ -5,8 +5,12 @@ import { eq } from "drizzle-orm"
 
 import { dbAdmin } from "@/lib/db/client"
 import { withRLS } from "@/lib/db/rls"
-import { microSites, professionals } from "@/lib/db/schema"
-import type { Professional } from "@/types/domain"
+import {
+  microSites,
+  professionalSettings,
+  professionals,
+} from "@/lib/db/schema"
+import type { GdprSettings, Professional } from "@/types/domain"
 
 // Single row scoped to the current Clerk user. RLS on `professionals` already
 // limits us to our own row, but we filter explicitly so the planner uses the
@@ -69,6 +73,22 @@ export async function getProfessionalForClientPortal(): Promise<{
     .where(eq(professionals.clerkOrgId, orgId))
     .limit(1)
   return rows[0] ?? null
+}
+
+// Cheap projection of the professional's privacy-policy URL — cookie banner
+// on the public micro-site fetches it to link "Privacy policy" to the
+// professional's own document when they've configured one. Service-role
+// because we may be rendering for an anonymous visitor.
+export async function getProfessionalPrivacyPolicyUrl(
+  professionalId: string,
+): Promise<string | null> {
+  const rows = await dbAdmin
+    .select({ gdprSettings: professionalSettings.gdprSettings })
+    .from(professionalSettings)
+    .where(eq(professionalSettings.professionalId, professionalId))
+    .limit(1)
+  const settings = rows[0]?.gdprSettings as GdprSettings | null
+  return settings?.privacy_policy_url ?? null
 }
 
 // Public lookup used by the micro-site routes ([slug]/...). Goes through

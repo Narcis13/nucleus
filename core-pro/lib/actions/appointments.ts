@@ -18,6 +18,7 @@ import {
   updateAppointment as updateAppointmentQuery,
 } from "@/lib/db/queries/appointments"
 import { getProfessional } from "@/lib/db/queries/professionals"
+import { evaluateTrigger } from "@/lib/automations/engine"
 import { sendAppointmentEmails, scheduleAppointmentReminders } from "@/lib/scheduling/notifications"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,6 +151,15 @@ export const updateAppointmentAction = authedAction
 
     if (startAt || endAt) {
       void scheduleAppointmentReminders(id).catch(() => {})
+    }
+
+    if (parsedInput.status === "completed") {
+      void evaluateTrigger("appointment_completed", {
+        type: "appointment_completed",
+        professionalId: updated.professionalId,
+        clientId: updated.clientId ?? null,
+        appointmentId: updated.id,
+      }).catch(() => {})
     }
 
     revalidatePath("/dashboard/calendar")

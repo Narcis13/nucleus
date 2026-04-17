@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 import { z } from "zod"
 
 import { ActionError, authedAction } from "@/lib/actions/safe-action"
+import { evaluateTrigger } from "@/lib/automations/engine"
 import {
   archiveForm as archiveFormQuery,
   assignFormToClients as assignFormQuery,
@@ -211,6 +212,14 @@ export const submitFormResponseAction = authedAction
       formId: assignment.formId,
       data: parsedInput.data as FormResponseData,
     })
+
+    void evaluateTrigger("form_submitted", {
+      type: "form_submitted",
+      professionalId: assignment.professionalId,
+      clientId: assignment.clientId,
+      formId: assignment.formId,
+      assignmentId: assignment.id,
+    }).catch(() => {})
 
     revalidatePath("/portal/forms")
     revalidatePath(`/portal/forms/${assignment.id}`)

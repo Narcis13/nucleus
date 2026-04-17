@@ -189,7 +189,7 @@ export type Branding = {
   primary_color?: string
   secondary_color?: string
   font?: string
-  logo_url?: string
+  logo_url?: string | null
 }
 
 export type UserRole = "professional" | "client" | "admin"
@@ -223,6 +223,47 @@ export type NotificationPreferences = {
   per_type?: Partial<Record<NotificationType, boolean>>
   per_channel?: Partial<Record<NotificationChannel, boolean>>
   quiet_hours?: QuietHours
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Professional settings payloads — each lives on a jsonb column of
+// professional_settings. We keep shapes loose so adding a field doesn't
+// require a migration; callers should always merge-patch rather than replace.
+// ─────────────────────────────────────────────────────────────────────────────
+export type CalendarSync = {
+  timezone?: string
+  google_calendar_sync_url?: string | null
+  ical_subscription_enabled?: boolean
+}
+
+export type IntegrationsConfig = {
+  zoom?: {
+    enabled: boolean
+    account_email?: string
+  }
+  google_meet?: {
+    enabled: boolean
+    account_email?: string
+  }
+}
+
+export type GdprSettings = {
+  retention_days?: number
+  auto_delete_inactive?: boolean
+  dpo_email?: string | null
+  privacy_policy_url?: string | null
+}
+
+export type ConsentType =
+  | "marketing_emails"
+  | "data_sharing"
+  | "analytics"
+  | "processing"
+
+export type ConsentRecord = {
+  consent: ConsentType
+  granted: boolean
+  recordedAt: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
