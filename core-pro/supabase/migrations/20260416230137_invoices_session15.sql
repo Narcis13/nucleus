@@ -40,8 +40,13 @@ ALTER TABLE "invoices" ADD CONSTRAINT "invoices_appointment_id_appointments_id_f
 
 CREATE INDEX IF NOT EXISTS "invoices_due_date_idx" ON "invoices" USING btree ("due_date");--> statement-breakpoint
 
--- `updated_at` trigger is attached globally by 9903_triggers.sql to every
--- table with an `updated_at` column — no per-table CREATE TRIGGER needed.
+-- `updated_at` trigger: 9903_triggers.sql attaches triggers to every table
+-- with an updated_at column, but only runs during a full `db reset`. For
+-- incremental `db push`, we must re-attach explicitly here so live DBs pick
+-- up triggers on new/altered tables.
+DROP TRIGGER IF EXISTS set_updated_at ON public.invoices;--> statement-breakpoint
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.invoices
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();--> statement-breakpoint
 
 -- ── invoice_settings ────────────────────────────────────────────────────────
 CREATE TABLE "invoice_settings" (
@@ -78,3 +83,8 @@ ALTER TABLE "payment_reminders" ADD CONSTRAINT "payment_reminders_professional_i
 CREATE INDEX "payment_reminders_invoice_idx" ON "payment_reminders" USING btree ("invoice_id");--> statement-breakpoint
 CREATE INDEX "payment_reminders_professional_idx" ON "payment_reminders" USING btree ("professional_id");--> statement-breakpoint
 CREATE POLICY "payment_reminders_professional_all" ON "payment_reminders" AS PERMISSIVE FOR ALL TO "authenticated" USING ("payment_reminders"."professional_id" = (select id from public.professionals where clerk_user_id = (select auth.jwt() ->> 'sub'))) WITH CHECK ("payment_reminders"."professional_id" = (select id from public.professionals where clerk_user_id = (select auth.jwt() ->> 'sub')));
+--> statement-breakpoint
+
+DROP TRIGGER IF EXISTS set_updated_at ON public.invoice_settings;--> statement-breakpoint
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.invoice_settings
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();

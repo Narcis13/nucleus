@@ -191,5 +191,13 @@ export const leadMagnetDownloads = pgTable(
       using: sql`${t.leadMagnetId} in (select id from public.lead_magnets where professional_id = ${currentProfessionalIdSql})`,
       withCheck: sql`${t.leadMagnetId} in (select id from public.lead_magnets where professional_id = ${currentProfessionalIdSql})`,
     }),
+    // Anon micro-site visitors log a download before any auth exists. The
+    // WITH CHECK pins the insert to a *published* lead magnet so random IDs
+    // can't be used to seed garbage rows.
+    pgPolicy("lead_magnet_downloads_public_insert", {
+      for: "insert",
+      to: [anonRole, authenticatedRole],
+      withCheck: sql`${t.leadMagnetId} in (select id from public.lead_magnets where is_published = true)`,
+    }),
   ],
 )

@@ -10,7 +10,7 @@ import {
   text,
   uuid,
 } from "drizzle-orm/pg-core"
-import { authenticatedRole } from "drizzle-orm/supabase"
+import { anonRole, authenticatedRole } from "drizzle-orm/supabase"
 
 import { createdAt, currentProfessionalIdSql } from "./_helpers"
 import { professionals } from "./professionals"
@@ -43,6 +43,12 @@ export const services = pgTable(
       to: authenticatedRole,
       using: sql`${t.professionalId} = ${currentProfessionalIdSql}`,
       withCheck: sql`${t.professionalId} = ${currentProfessionalIdSql}`,
+    }),
+    // Anonymous micro-site visitors must be able to list active services.
+    pgPolicy("services_public_select", {
+      for: "select",
+      to: [anonRole, authenticatedRole],
+      using: sql`${t.isActive} = true`,
     }),
   ],
 )

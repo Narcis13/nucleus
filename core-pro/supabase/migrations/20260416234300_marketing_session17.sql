@@ -246,3 +246,18 @@ CREATE POLICY "lead_magnet_downloads_professional_all" ON "lead_magnet_downloads
       )
     )
   );
+
+-- ── updated_at triggers ─────────────────────────────────────────────────────
+-- 9903_triggers.sql only runs on `db reset`. For incremental `db push`, attach
+-- triggers explicitly so live DBs pick them up for the new tables below.
+DROP TRIGGER IF EXISTS set_updated_at ON public.email_campaigns;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.email_campaigns
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_updated_at ON public.social_templates;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.social_templates
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_updated_at ON public.lead_magnets;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.lead_magnets
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();

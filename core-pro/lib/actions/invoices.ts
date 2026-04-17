@@ -11,6 +11,7 @@ import {
   createInvoice as createInvoiceQuery,
   deleteInvoice as deleteInvoiceQuery,
   getInvoice,
+  getInvoiceWithRefs,
   markInvoiceSent as markInvoiceSentQuery,
   markInvoiceViewed as markInvoiceViewedQuery,
   recordPayment as recordPaymentQuery,
@@ -22,6 +23,7 @@ import {
   sendInvoiceEmail,
   sendReceiptEmail,
 } from "@/lib/invoices/emails"
+import { renderInvoicePdf } from "@/lib/invoices/pdf"
 import { trackServerEvent } from "@/lib/posthog/events"
 import type { InvoiceLineItem } from "@/types/domain"
 
@@ -309,6 +311,31 @@ export const deleteInvoiceAction = authedAction
     if (!deleted) throw new ActionError("Couldn't delete invoice.")
     revalidatePath("/dashboard/invoices")
     return { ok: true }
+  })
+
+// Returns the rendered invoice PDF as a base64 string. The UI should prefer
+// the `/api/invoices/[id]/pdf` GET route for direct downloads; this action is
+// useful when the caller needs the bytes inline (e.g. to attach to an outgoing
+// email or to stash in storage). Scoped via withRLS through getInvoiceWithRefs.
+export const generateInvoicePDFAction = authedAction
+  .metadata({ actionName: "invoices.generatePdf" })
+  .inputSchema(idSchema)
+  .action(async ({ parsedInput }) => {
+    const data = await getInvoiceWithRefs(parsedInput.id)
+    if (!data || !data.professional) {
+      throw new ActionError("Invoice not found.")
+    }
+    const buffer = await renderInvoicePdf({
+      invoice: data.invoice,
+      client: data.client,
+      professional: data.professional,
+      settings: data.settings,
+    })
+    return {
+      filename: `${data.invoice.invoiceNumber || data.invoice.id}.pdf`,
+      mimeType: "application/pdf",
+      base64: buffer.toString("base64"),
+    }
   })
 
 export const saveInvoiceSettingsAction = authedAction

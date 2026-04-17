@@ -1,5 +1,6 @@
 "use server"
 
+import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
@@ -20,6 +21,7 @@ import {
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { evaluateTrigger } from "@/lib/automations/engine"
 import { trackServerEvent } from "@/lib/posthog/events"
+import { publicFormRateLimit } from "@/lib/ratelimit"
 import { sendAppointmentEmails, scheduleAppointmentReminders } from "@/lib/scheduling/notifications"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -254,6 +256,22 @@ export const createBookingAction = publicAction
   .metadata({ actionName: "appointments.book" })
   .inputSchema(bookingSchema)
   .action(async ({ parsedInput }) => {
+    if (publicFormRateLimit) {
+      const hdrs = await headers()
+      const ip =
+        hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+        hdrs.get("x-real-ip") ??
+        "anonymous"
+      const { success } = await publicFormRateLimit.limit(
+        `booking:${parsedInput.professionalId}:${ip}`,
+      )
+      if (!success) {
+        throw new ActionError(
+          "You're booking too quickly — try again in a minute.",
+        )
+      }
+    }
+
     const startAt = new Date(parsedInput.startAt)
     const endAt = new Date(parsedInput.endAt)
     if (endAt <= startAt) {

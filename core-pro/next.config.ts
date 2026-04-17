@@ -14,9 +14,15 @@ const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts")
 const nextConfig: NextConfig = {
   typedRoutes: true,
   images: {
-    // Avatars, Stripe assets, Supabase Storage — wire real hosts in later
-    // sessions. Kept empty by default for explicit opt-in.
-    remotePatterns: [],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/**",
+      },
+      { protocol: "https", hostname: "img.clerk.com" },
+      { protocol: "https", hostname: "images.clerk.dev" },
+    ],
   },
 }
 

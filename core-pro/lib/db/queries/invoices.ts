@@ -115,7 +115,7 @@ export async function getInvoiceWithRefs(id: string): Promise<
       client: Client | null
       professional: Pick<
         Professional,
-        "id" | "fullName" | "email" | "currency"
+        "id" | "fullName" | "email" | "currency" | "locale"
       > | null
       settings: InvoiceSettings | null
     }
@@ -131,6 +131,7 @@ export async function getInvoiceWithRefs(id: string): Promise<
           fullName: professionals.fullName,
           email: professionals.email,
           currency: professionals.currency,
+          locale: professionals.locale,
         },
       })
       .from(invoices)
