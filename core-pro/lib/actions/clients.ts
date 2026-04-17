@@ -24,6 +24,7 @@ import {
   updateRelationship,
 } from "@/lib/db/queries/clients"
 import { getProfessional } from "@/lib/db/queries/professionals"
+import { trackServerEvent } from "@/lib/posthog/events"
 import { getPlan, planLimitsFor } from "@/lib/stripe/plans"
 import type { PlanLimits } from "@/types/domain"
 
@@ -160,6 +161,15 @@ export const createClientAction = authedAction
       professionalId: professional.id,
       clientId: created.id,
     }).catch(() => {})
+
+    void trackServerEvent("client_added", {
+      distinctId: professional.clerkUserId,
+      professionalId: professional.id,
+      plan: professional.plan,
+      clientId: created.id,
+      invited,
+      source: parsedInput.source || null,
+    })
 
     revalidatePath("/dashboard/clients")
     return { id: created.id, invited }

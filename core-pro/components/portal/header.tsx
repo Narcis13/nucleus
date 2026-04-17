@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useClerk } from "@clerk/nextjs"
 import { LogOut, Menu, User } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { useState } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -17,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { LocaleSwitcher } from "@/components/shared/i18n/locale-switcher"
 import { NotificationBell } from "@/components/shared/notifications/notification-bell"
 import { usePortalContext } from "@/hooks/use-portal-context"
 import { cn, getInitials } from "@/lib/utils"
@@ -47,8 +49,9 @@ export function PortalHeader({
   const { signOut } = useClerk()
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const t = useTranslations("portal.header")
 
-  const label = brandName?.trim() || "Your workspace"
+  const label = brandName?.trim() || t("defaultWorkspace")
   const initials = label.slice(0, 2).toUpperCase()
 
   return (
@@ -102,6 +105,7 @@ export function PortalHeader({
         />
 
         <div className="flex flex-1 items-center justify-end gap-1">
+          <LocaleSwitcher variant="compact" />
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -110,7 +114,7 @@ export function PortalHeader({
                   variant="ghost"
                   size="icon-sm"
                   className="rounded-full"
-                  aria-label="Account menu"
+                  aria-label={t("accountMenu")}
                 />
               }
             >
@@ -142,7 +146,7 @@ export function PortalHeader({
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
                 <User className="size-4" />
-                Profile (soon)
+                {t("profile")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -152,7 +156,7 @@ export function PortalHeader({
                 }}
               >
                 <LogOut className="size-4" />
-                Sign out
+                {t("signOut")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

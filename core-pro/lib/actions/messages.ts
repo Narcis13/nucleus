@@ -11,6 +11,7 @@ import {
   sendMessage as sendMessageQuery,
 } from "@/lib/db/queries/messages"
 import { getProfessional } from "@/lib/db/queries/professionals"
+import { trackServerEvent } from "@/lib/posthog/events"
 import { dbAdmin } from "@/lib/db/client"
 import { clients } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -56,6 +57,16 @@ export const sendMessageAction = authedAction
       type: parsedInput.type,
       mediaUrl: parsedInput.mediaUrl,
     })
+
+    const { userId } = await auth()
+    if (userId) {
+      void trackServerEvent("message_sent", {
+        distinctId: userId,
+        conversationId: parsedInput.conversationId,
+        senderRole: sender.role,
+        messageType: parsedInput.type,
+      })
+    }
 
     // Revalidate both sides — the list previews and unread badges depend on
     // the bumped `last_message_at` and the new row. Realtime handles the

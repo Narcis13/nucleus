@@ -37,6 +37,7 @@ import {
 } from "@/lib/db/schema"
 import { env } from "@/lib/env"
 import { expandMergeTags, type MergeTagContext } from "@/lib/marketing/templates"
+import { trackServerEvent } from "@/lib/posthog/events"
 import { publicFormRateLimit } from "@/lib/ratelimit"
 import { fromAddress, getResend } from "@/lib/resend/client"
 import { captureException } from "@/lib/sentry"
@@ -320,6 +321,16 @@ export const sendCampaignAction = authedAction
     }
 
     await finalizeCampaignSend(campaign.id, delivered)
+
+    void trackServerEvent("email_campaign_sent", {
+      distinctId: professional.clerkUserId,
+      professionalId: professional.id,
+      plan: professional.plan,
+      campaignId: campaign.id,
+      delivered,
+      total: recipients.length,
+    })
+
     revalidatePath("/dashboard/marketing")
     return { delivered, total: recipients.length }
   })

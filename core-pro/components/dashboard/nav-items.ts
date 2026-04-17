@@ -19,7 +19,11 @@ import {
 } from "lucide-react"
 
 export type NavItem = {
-  label: string
+  // Key under `dashboard.nav.*` in the messages bundles. The nav components
+  // resolve it at render time so the sidebar relabels itself on locale switch.
+  labelKey: string
+  // Baked-in English fallback used when a niche fork ships an untranslated key.
+  fallbackLabel: string
   // `Route` rather than raw `string` so these stay compatible with Next 16's
   // typedRoutes — each literal below is validated against the generated
   // AppRoutes union at build time.
@@ -35,24 +39,25 @@ export type NavItem = {
 // Primary sidebar items, in display order. `Settings` is pinned to the bottom
 // of the sidebar separately so it's not included here.
 export const PRIMARY_NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: Home },
-  { label: "Clients", href: "/dashboard/clients", icon: Users },
-  { label: "Leads", href: "/dashboard/leads", icon: Target },
-  { label: "Services", href: "/dashboard/services", icon: Briefcase },
-  { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
+  { labelKey: "home", fallbackLabel: "Dashboard", href: "/dashboard", icon: Home },
+  { labelKey: "clients", fallbackLabel: "Clients", href: "/dashboard/clients", icon: Users },
+  { labelKey: "leads", fallbackLabel: "Leads", href: "/dashboard/leads", icon: Target },
+  { labelKey: "services", fallbackLabel: "Services", href: "/dashboard/services", icon: Briefcase },
+  { labelKey: "calendar", fallbackLabel: "Calendar", href: "/dashboard/calendar", icon: Calendar },
   {
-    label: "Messages",
+    labelKey: "messages",
+    fallbackLabel: "Messages",
     href: "/dashboard/messages",
     icon: MessageCircle,
     badgeKey: "unread_messages",
   },
-  { label: "Forms", href: "/dashboard/forms", icon: FileText },
-  { label: "Documents", href: "/dashboard/documents", icon: FolderOpen },
-  { label: "Invoices", href: "/dashboard/invoices", icon: Receipt },
-  { label: "Automations", href: "/dashboard/automations", icon: Zap },
-  { label: "Marketing", href: "/dashboard/marketing", icon: Megaphone },
-  { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { label: "Site Builder", href: "/dashboard/site-builder", icon: Globe },
+  { labelKey: "forms", fallbackLabel: "Forms", href: "/dashboard/forms", icon: FileText },
+  { labelKey: "documents", fallbackLabel: "Documents", href: "/dashboard/documents", icon: FolderOpen },
+  { labelKey: "invoices", fallbackLabel: "Invoices", href: "/dashboard/invoices", icon: Receipt },
+  { labelKey: "automations", fallbackLabel: "Automations", href: "/dashboard/automations", icon: Zap },
+  { labelKey: "marketing", fallbackLabel: "Marketing", href: "/dashboard/marketing", icon: Megaphone },
+  { labelKey: "analytics", fallbackLabel: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { labelKey: "siteBuilder", fallbackLabel: "Site Builder", href: "/dashboard/site-builder", icon: Globe },
 ]
 
 // Niche extension items. The boilerplate ships with a single placeholder so
@@ -60,7 +65,8 @@ export const PRIMARY_NAV: NavItem[] = [
 // real routes.
 export const NICHE_NAV: NavItem[] = [
   {
-    label: "Niche module",
+    labelKey: "niche",
+    fallbackLabel: "Niche module",
     href: "#",
     icon: Sparkles,
     placeholder: true,
@@ -68,23 +74,25 @@ export const NICHE_NAV: NavItem[] = [
 ]
 
 export const SETTINGS_NAV: NavItem = {
-  label: "Settings",
+  labelKey: "settings",
+  fallbackLabel: "Settings",
   href: "/dashboard/settings",
   icon: Settings,
 }
 
 // Subset pinned to the mobile bottom tab bar. Kept short so labels fit.
 export const MOBILE_BOTTOM_NAV: NavItem[] = [
-  { label: "Home", href: "/dashboard", icon: Home },
-  { label: "Clients", href: "/dashboard/clients", icon: Users },
-  { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
+  { labelKey: "home", fallbackLabel: "Home", href: "/dashboard", icon: Home },
+  { labelKey: "clients", fallbackLabel: "Clients", href: "/dashboard/clients", icon: Users },
+  { labelKey: "calendar", fallbackLabel: "Calendar", href: "/dashboard/calendar", icon: Calendar },
   {
-    label: "Messages",
+    labelKey: "messages",
+    fallbackLabel: "Messages",
     href: "/dashboard/messages",
     icon: MessageCircle,
     badgeKey: "unread_messages",
   },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  { labelKey: "settings", fallbackLabel: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
 // Active-path matcher shared by desktop + mobile nav. `/dashboard` should only

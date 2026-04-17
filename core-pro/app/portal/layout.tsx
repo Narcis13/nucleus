@@ -5,6 +5,8 @@ import { PortalHeader } from "@/components/portal/header"
 import { PortalMobileNav } from "@/components/portal/mobile-nav"
 import { getCurrentClerkUserId } from "@/lib/clerk/helpers"
 import { getProfessionalForClientPortal } from "@/lib/db/queries/professionals"
+import { getPortalLocalePreference } from "@/lib/db/queries/portal-locale"
+import { syncLocaleFromDb } from "@/lib/i18n/locale"
 import type { Branding } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +33,12 @@ export default async function PortalLayout({
   if (!clerkUserId) {
     redirect("/sign-in?redirect_url=/portal")
   }
+
+  // Seed the locale cookie from the DB on first visit so the portal paints
+  // in the right language before the client ever opens the switcher. A no-op
+  // once the cookie exists — the switcher is always authoritative after that.
+  const localePreference = await getPortalLocalePreference()
+  await syncLocaleFromDb(localePreference)
 
   // Resolve the professional by the client's active Clerk org. May legitimately
   // be null — e.g. a signed-in client who's between workspaces or whose org

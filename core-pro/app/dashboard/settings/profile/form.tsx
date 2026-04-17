@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useAction } from "next-safe-action/hooks"
 import { toast } from "sonner"
 import { Camera, Loader2, Plus, Trash2 } from "lucide-react"
 
+import { LocaleSwitcher } from "@/components/shared/i18n/locale-switcher"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -30,6 +32,8 @@ import type { Professional } from "@/types/domain"
 
 export function ProfileForm({ professional }: { professional: Professional }) {
   const supabase = useSupabaseBrowser()
+  const t = useTranslations("dashboard.settings")
+  const tCommon = useTranslations("common")
   const [form, setForm] = useState(() => ({
     fullName: professional.fullName ?? "",
     bio: professional.bio ?? "",
@@ -47,10 +51,10 @@ export function ProfileForm({ professional }: { professional: Professional }) {
 
   const { execute: save, isExecuting: saving } = useAction(updateProfileAction, {
     onSuccess() {
-      toast.success("Profile saved")
+      toast.success(t("profile.saved"))
     },
     onError({ error }) {
-      toast.error(error.serverError ?? "Couldn't save profile")
+      toast.error(error.serverError ?? t("profile.saveError"))
     },
   })
 
@@ -108,11 +112,8 @@ export function ProfileForm({ professional }: { professional: Professional }) {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Professional profile</CardTitle>
-          <CardDescription>
-            Your name, photo, and bio are shown on the client portal and any
-            published micro-site.
-          </CardDescription>
+          <CardTitle>{t("profile.title")}</CardTitle>
+          <CardDescription>{t("profile.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -140,7 +141,9 @@ export function ProfileForm({ professional }: { professional: Professional }) {
                 ) : (
                   <Camera className="size-4" />
                 )}
-                {avatarUrl ? "Replace photo" : "Upload photo"}
+                {avatarUrl
+                  ? t("profile.replacePhoto")
+                  : t("profile.uploadPhoto")}
               </Label>
               <input
                 id="avatar-input"
@@ -151,7 +154,7 @@ export function ProfileForm({ professional }: { professional: Professional }) {
                 onChange={(e) => onAvatarPicked(e.target.files?.[0] ?? null)}
               />
               <p className="text-xs text-muted-foreground">
-                PNG, JPG, WebP or GIF. Up to 5 MB.
+                {t("profile.photoHint")}
               </p>
             </div>
           </div>
@@ -159,37 +162,37 @@ export function ProfileForm({ professional }: { professional: Professional }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               id="fullName"
-              label="Full name"
+              label={t("profile.fullName")}
               value={form.fullName}
               onChange={(v) => setForm((f) => ({ ...f, fullName: v }))}
             />
             <Field
               id="phone"
-              label="Phone"
+              label={t("profile.phone")}
               value={form.phone}
               onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bio">Short bio</Label>
+            <Label htmlFor="bio">{t("profile.bio")}</Label>
             <Textarea
               id="bio"
               rows={4}
               value={form.bio}
               onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-              placeholder="One or two paragraphs shown on your micro-site."
+              placeholder={t("profile.bioPlaceholder")}
             />
           </div>
 
           <ListEditor
-            label="Specializations"
+            label={t("profile.specializations")}
             values={form.specialization}
             placeholder="Nutrition therapy, Sleep coaching…"
             onChange={(next) => setForm((f) => ({ ...f, specialization: next }))}
           />
           <ListEditor
-            label="Certifications"
+            label={t("profile.certifications")}
             values={form.certifications}
             placeholder="ISSA, RYT-200, PhD Nutrition…"
             onChange={(next) => setForm((f) => ({ ...f, certifications: next }))}
@@ -199,40 +202,37 @@ export function ProfileForm({ professional }: { professional: Professional }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Locale</CardTitle>
-          <CardDescription>
-            Controls the default timezone, language, and currency we use for
-            your invoices, reminders, and calendar feed.
-          </CardDescription>
+          <CardTitle>{t("locale.title")}</CardTitle>
+          <CardDescription>{t("locale.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
           <Field
             id="timezone"
-            label="Timezone"
+            label={t("locale.timezone")}
             value={form.timezone}
             onChange={(v) => setForm((f) => ({ ...f, timezone: v }))}
-            hint="IANA name, e.g. Europe/Bucharest."
+            hint={t("locale.timezoneHint")}
           />
-          <Field
-            id="locale"
-            label="Language"
-            value={form.locale}
-            onChange={(v) => setForm((f) => ({ ...f, locale: v }))}
-            hint="ISO code, e.g. ro or en."
-          />
+          <div className="space-y-1.5">
+            <Label>{t("locale.language")}</Label>
+            <LocaleSwitcher align="start" className="w-full justify-start" />
+            <p className="text-xs text-muted-foreground">
+              {t("locale.languageHint")}
+            </p>
+          </div>
           <Field
             id="currency"
-            label="Currency"
+            label={t("locale.currency")}
             value={form.currency}
             onChange={(v) => setForm((f) => ({ ...f, currency: v }))}
-            hint="ISO 4217, e.g. EUR, RON."
+            hint={t("locale.currencyHint")}
           />
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
         <Button onClick={onSave} disabled={saving}>
-          {saving ? "Saving…" : "Save profile"}
+          {saving ? tCommon("saving") : t("profile.saveProfile")}
         </Button>
       </div>
     </div>

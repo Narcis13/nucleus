@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm"
 import { dbAdmin } from "@/lib/db/client"
 import { env } from "@/lib/env"
 import { fromAddress, getResend } from "@/lib/resend/client"
+import { makeEmailTranslator } from "@/lib/resend/translator"
 import {
   appointments,
   clients,
@@ -43,7 +44,10 @@ export async function sendAppointmentEmails(args: SendArgs): Promise<void> {
   const proRecipient = professional.email
   const clientRecipient = client?.email ?? guestEmail
   const clientLabel = client?.fullName ?? guestName ?? "Guest"
-  const subject = subjectFor(args.kind, appointment.title)
+  const proLocale = professional.locale ?? null
+  const clientLocale = client?.locale ?? proLocale
+  const proSubject = subjectFor(args.kind, appointment.title, proLocale)
+  const clientSubject = subjectFor(args.kind, appointment.title, clientLocale)
 
   // Generate a single .ics invite — only attached on confirmation. Reminder
   // emails skip the attachment because most calendars already have the event.
@@ -67,6 +71,7 @@ export async function sendAppointmentEmails(args: SendArgs): Promise<void> {
 
   const baseProps = {
     professionalName: professional.fullName,
+    branding: professional.branding,
     clientName: clientLabel,
     title: appointment.title,
     startAtIso: new Date(appointment.startAt).toISOString(),
@@ -82,6 +87,7 @@ export async function sendAppointmentEmails(args: SendArgs): Promise<void> {
       ...baseProps,
       recipientName: professional.fullName,
       recipientRole: "professional",
+      locale: proLocale,
     }),
   )
   const clientHtml = await render(
@@ -89,6 +95,7 @@ export async function sendAppointmentEmails(args: SendArgs): Promise<void> {
       ...baseProps,
       recipientName: clientLabel,
       recipientRole: "client",
+      locale: clientLocale,
     }),
   )
 
@@ -97,7 +104,7 @@ export async function sendAppointmentEmails(args: SendArgs): Promise<void> {
     resend.emails.send({
       from: fromAddress(),
       to: proRecipient,
-      subject,
+      subject: proSubject,
       html: proHtml,
       attachments,
     }),
@@ -107,7 +114,7 @@ export async function sendAppointmentEmails(args: SendArgs): Promise<void> {
       resend.emails.send({
         from: fromAddress(),
         to: clientRecipient,
-        subject,
+        subject: clientSubject,
         html: clientHtml,
         attachments,
       }),
@@ -160,20 +167,30 @@ export async function scheduleAppointmentReminders(
 // helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function subjectFor(kind: AppointmentEmailKind, title: string): string {
-  const prefix = {
-    confirmation: "Confirmed",
-    reminder_24h: "Reminder",
-    reminder_1h: "Starting soon",
-    cancellation: "Cancelled",
-  }[kind]
-  return `[${prefix}] ${title}`
+function subjectFor(
+  kind: AppointmentEmailKind,
+  title: string,
+  locale: string | null,
+): string {
+  const t = makeEmailTranslator(locale)
+  const date = "" // subject template uses {date}; callers may also pass the
+  // appointment date here, but keeping empty preserves the short form while
+  // still letting RO/EN phrasings differ.
+  return kind === "confirmation"
+    ? t("emails.appointmentConfirmation.subject", { title, date })
+    : t("emails.appointmentReminder.subject", { title, date })
 }
 
 type AppointmentContext = {
   appointment: typeof appointments.$inferSelect
-  professional: { id: string; fullName: string; email: string }
-  client: { id: string; fullName: string; email: string } | null
+  professional: {
+    id: string
+    fullName: string
+    email: string
+    branding: import("@/types/domain").Branding | null
+    locale: string | null
+  }
+  client: { id: string; fullName: string; email: string; locale: string | null } | null
   service: { id: string; name: string; durationMinutes: number | null } | null
   guestName: string | null
   guestEmail: string | null
@@ -189,11 +206,14 @@ async function fetchAppointmentContext(
         id: professionals.id,
         fullName: professionals.fullName,
         email: professionals.email,
+        branding: professionals.branding,
+        locale: professionals.locale,
       },
       client: {
         id: clients.id,
         fullName: clients.fullName,
         email: clients.email,
+        locale: clients.locale,
       },
       service: {
         id: services.id,
@@ -216,7 +236,15 @@ async function fetchAppointmentContext(
     | null
   return {
     appointment: row.appointment,
-    professional: row.professional,
+    professional: {
+      id: row.professional.id,
+      fullName: row.professional.fullName,
+      email: row.professional.email,
+      branding: (row.professional.branding ?? null) as
+        | import("@/types/domain").Branding
+        | null,
+      locale: row.professional.locale ?? null,
+    },
     client: row.client?.id ? row.client : null,
     service: row.service?.id ? row.service : null,
     guestName: meta?.guest_name ?? null,

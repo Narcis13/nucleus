@@ -3,6 +3,7 @@
 import type { Route } from "next"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
 
@@ -22,6 +23,7 @@ import { PORTAL_MOBILE_NAV, isPortalNavActive } from "./nav-items"
 
 export function PortalMobileNav() {
   const pathname = usePathname() ?? ""
+  const t = useTranslations("portal.nav")
 
   return (
     <nav
@@ -31,6 +33,12 @@ export function PortalMobileNav() {
       {PORTAL_MOBILE_NAV.map((item) => {
         const Icon = item.icon
         const active = isPortalNavActive(pathname, item.href)
+        let label = item.fallbackLabel
+        try {
+          label = t(item.labelKey)
+        } catch {
+          /* untranslated niche key — keep the fallback */
+        }
         return (
           <Link
             key={item.href}
@@ -44,7 +52,7 @@ export function PortalMobileNav() {
             )}
           >
             <Icon className="size-5" aria-hidden />
-            <span>{item.label}</span>
+            <span>{label}</span>
             {active && (
               <span
                 aria-hidden

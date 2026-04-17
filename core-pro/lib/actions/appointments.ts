@@ -19,6 +19,7 @@ import {
 } from "@/lib/db/queries/appointments"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { evaluateTrigger } from "@/lib/automations/engine"
+import { trackServerEvent } from "@/lib/posthog/events"
 import { sendAppointmentEmails, scheduleAppointmentReminders } from "@/lib/scheduling/notifications"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,6 +133,15 @@ export const createAppointmentAction = authedAction
       kind: "confirmation",
     }).catch(() => {})
     void scheduleAppointmentReminders(created.id).catch(() => {})
+
+    void trackServerEvent("appointment_created", {
+      distinctId: professional.clerkUserId,
+      professionalId: professional.id,
+      plan: professional.plan,
+      appointmentId: created.id,
+      origin: "professional",
+      type: parsedInput.type,
+    })
 
     revalidatePath("/dashboard/calendar")
     return { id: created.id }
@@ -263,5 +273,15 @@ export const createBookingAction = publicAction
       appointmentId: created.id,
       kind: "confirmation",
     }).catch(() => {})
+
+    // Public bookings have no Clerk session to anchor the event to — use the
+    // professional's id as the distinct id so the funnel aggregates per pro.
+    void trackServerEvent("appointment_created", {
+      distinctId: parsedInput.professionalId,
+      professionalId: parsedInput.professionalId,
+      appointmentId: created.id,
+      origin: "public_booking",
+      type: "in_person",
+    })
     return { id: created.id }
   })

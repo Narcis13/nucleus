@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useCallback, useState, type ReactNode } from "react"
 import { ChevronsLeft, ChevronsRight } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -226,6 +227,13 @@ function SidebarLink({
   const pathname = usePathname() ?? ""
   const active = !item.placeholder && isNavActive(pathname, item.href)
   const Icon = item.icon
+  const t = useTranslations("dashboard.nav")
+  let label = item.fallbackLabel
+  try {
+    label = t(item.labelKey)
+  } catch {
+    /* untranslated niche key — keep the fallback */
+  }
 
   const content = (
     <>
@@ -236,7 +244,7 @@ function SidebarLink({
         )}
         aria-hidden
       />
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      {!collapsed && <span className="truncate">{label}</span>}
       {!collapsed && item.badgeKey && <NavBadge badgeKey={item.badgeKey} />}
       {collapsed && item.badgeKey && (
         <NavBadge badgeKey={item.badgeKey} collapsedDot />
@@ -276,7 +284,7 @@ function SidebarLink({
       <Tooltip>
         <TooltipTrigger render={link} />
         <TooltipContent side="right" sideOffset={8}>
-          {item.label}
+          {label}
         </TooltipContent>
       </Tooltip>
     </li>

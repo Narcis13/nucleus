@@ -3,6 +3,7 @@
 import type { Route } from "next"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { cn } from "@/lib/utils"
@@ -22,6 +23,7 @@ import { MOBILE_BOTTOM_NAV, isNavActive } from "./nav-items"
 export function MobileNav() {
   const pathname = usePathname() ?? ""
   const unreadCount = useUnreadMessages()
+  const t = useTranslations("dashboard.nav")
 
   return (
     <nav
@@ -32,6 +34,12 @@ export function MobileNav() {
         const Icon = item.icon
         const active = isNavActive(pathname, item.href)
         const showBadge = item.badgeKey === "unread_messages" && unreadCount > 0
+        let label = item.fallbackLabel
+        try {
+          label = t(item.labelKey)
+        } catch {
+          /* untranslated niche key — keep the fallback */
+        }
         return (
           <Link
             key={item.href}
@@ -53,7 +61,7 @@ export function MobileNav() {
                 />
               )}
             </span>
-            <span>{item.label}</span>
+            <span>{label}</span>
             {active && (
               <span
                 aria-hidden

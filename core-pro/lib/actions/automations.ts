@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { ActionError, authedAction } from "@/lib/actions/safe-action"
+import { getProfessional } from "@/lib/db/queries/professionals"
+import { trackServerEvent } from "@/lib/posthog/events"
 import {
   createAutomation as createAutomationQuery,
   deleteAutomation as deleteAutomationQuery,
@@ -124,6 +126,18 @@ export const createAutomationAction = authedAction
       actions: parsedInput.actions as AutomationAction[],
       isActive: parsedInput.isActive,
     })
+
+    const professional = await getProfessional()
+    if (professional) {
+      void trackServerEvent("automation_created", {
+        distinctId: professional.clerkUserId,
+        professionalId: professional.id,
+        plan: professional.plan,
+        automationId: row.id,
+        triggerType: parsedInput.triggerType,
+      })
+    }
+
     revalidatePath("/dashboard/automations")
     return { id: row.id }
   })

@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
+import { LocaleOverrideProvider } from "@/components/shared/i18n/locale-provider"
 import { AboutSection } from "@/components/micro-site/about-section"
 import {
   BlogSection,
@@ -179,24 +180,26 @@ export default async function MicroSitePage({
   }
 
   return (
-    <div className="ms-root" style={style}>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-      />
-      {site.sections.order.map((sectionType) => {
-        const render = renderers[sectionType]
-        if (!render) return null
-        return <div key={sectionType}>{render()}</div>
-      })}
-      {leadMagnets.length > 0 && (
-        <LeadMagnetsSection magnets={leadMagnets} slug={slug} />
-      )}
-      <MicroSiteFooter
-        professional={site.professional}
-        socialLinks={site.socialLinks}
-      />
-      <CookieBanner privacyPolicyUrl={privacyPolicyUrl} />
-    </div>
+    <LocaleOverrideProvider locale={site.professional.locale}>
+      <div className="ms-root" style={style}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        {site.sections.order.map((sectionType) => {
+          const render = renderers[sectionType]
+          if (!render) return null
+          return <div key={sectionType}>{render()}</div>
+        })}
+        {leadMagnets.length > 0 && (
+          <LeadMagnetsSection magnets={leadMagnets} slug={slug} />
+        )}
+        <MicroSiteFooter
+          professional={site.professional}
+          socialLinks={site.socialLinks}
+        />
+        <CookieBanner privacyPolicyUrl={privacyPolicyUrl} />
+      </div>
+    </LocaleOverrideProvider>
   )
 }

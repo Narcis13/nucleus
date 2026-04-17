@@ -1,19 +1,15 @@
-import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Hr,
-  Html,
-  Preview,
-  Section,
-  Text,
-} from "@react-email/components"
+import { Section, Text } from "@react-email/components"
 
-// React Email template for appointment reminders + confirmations.
-// Same shape covers 24h reminder, 1h reminder, and the initial booking
-// confirmation — kind drives the heading + lead copy only, so we don't have
-// three near-identical templates to maintain.
+import { formatDate, formatTime } from "@/lib/i18n/format"
+import { makeEmailTranslator } from "@/lib/resend/translator"
+
+import { BrandShell, type BrandContext } from "./_shell"
+
+// React Email template for appointment reminders + confirmations + cancellations.
+// One template covers all four kinds — kind drives the heading + lead copy
+// only, so we don't have three near-identical templates to maintain. The
+// dedicated `appointment-confirmation.tsx` module is a thin wrapper that always
+// passes `kind: "confirmation"` for callers that prefer the explicit name.
 
 export type AppointmentEmailKind =
   | "confirmation"
@@ -21,131 +17,78 @@ export type AppointmentEmailKind =
   | "reminder_1h"
   | "cancellation"
 
-export type AppointmentEmailProps = {
+export type AppointmentEmailProps = BrandContext & {
   kind: AppointmentEmailKind
   recipientName: string
   recipientRole: "professional" | "client"
-  professionalName: string
   clientName: string | null
   title: string
   startAtIso: string
   endAtIso: string
   location: string | null
   notes: string | null
-  appUrl: string
-}
-
-const HEADINGS: Record<AppointmentEmailKind, string> = {
-  confirmation: "Appointment confirmed",
-  reminder_24h: "Reminder: appointment tomorrow",
-  reminder_1h: "Starting soon",
-  cancellation: "Appointment cancelled",
-}
-
-const LEADS: Record<AppointmentEmailKind, string> = {
-  confirmation:
-    "Your appointment has been added to the calendar. Details below.",
-  reminder_24h:
-    "Just a heads-up — you have an appointment scheduled for tomorrow.",
-  reminder_1h:
-    "Your appointment starts in about an hour. Make sure you're ready.",
-  cancellation:
-    "The appointment below has been cancelled. No action needed.",
+  manageUrl?: string | null
 }
 
 export default function AppointmentReminderEmail(
   props: AppointmentEmailProps,
 ) {
+  const t = makeEmailTranslator(props.locale)
   const start = new Date(props.startAtIso)
   const end = new Date(props.endAtIso)
-  const dateLabel = start.toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  })
-  const timeLabel = `${start.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  })} – ${end.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`
+  const dateLabel = formatDate(start, { locale: props.locale ?? undefined, style: "full" })
+  const timeLabel = `${formatTime(start, { locale: props.locale ?? undefined })} – ${formatTime(end, { locale: props.locale ?? undefined })}`
 
   const counterparty =
     props.recipientRole === "professional"
       ? props.clientName ?? "Guest"
       : props.professionalName
 
+  const firstName =
+    props.recipientName.split(" ")[0] || props.recipientName
+
+  const manageUrl =
+    props.manageUrl ??
+    (props.recipientRole === "professional"
+      ? `${props.appUrl.replace(/\/$/, "")}/dashboard/calendar`
+      : `${props.appUrl.replace(/\/$/, "")}/portal/appointments`)
+
+  const isConfirmation = props.kind === "confirmation"
+  const intlKey = isConfirmation
+    ? "emails.appointmentConfirmation"
+    : "emails.appointmentReminder"
+
   return (
-    <Html>
-      <Head />
-      <Preview>{HEADINGS[props.kind]} — {props.title}</Preview>
-      <Body
-        style={{
-          backgroundColor: "#f6f7f9",
-          fontFamily:
-            "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        }}
-      >
-        <Container
-          style={{
-            backgroundColor: "#ffffff",
-            margin: "32px auto",
-            padding: "32px",
-            borderRadius: "12px",
-            maxWidth: "560px",
-          }}
-        >
-          <Heading
-            style={{
-              fontSize: "20px",
-              fontWeight: 600,
-              color: "#0f172a",
-              marginBottom: "8px",
-            }}
-          >
-            {HEADINGS[props.kind]}
-          </Heading>
-          <Text style={{ fontSize: "14px", color: "#475569", margin: 0 }}>
-            Hi {props.recipientName.split(" ")[0] || props.recipientName},
-          </Text>
-          <Text style={{ fontSize: "14px", color: "#475569", marginTop: "4px" }}>
-            {LEADS[props.kind]}
-          </Text>
-
-          <Hr style={{ borderColor: "#e2e8f0", margin: "20px 0" }} />
-
-          <Section>
-            <Row label="What" value={props.title} />
-            <Row label="With" value={counterparty} />
-            <Row label="When" value={`${dateLabel}, ${timeLabel}`} />
-            {props.location && (
-              <Row label="Where" value={props.location} />
-            )}
-            {props.notes && (
-              <Row label="Notes" value={props.notes} />
-            )}
-          </Section>
-
-          <Hr style={{ borderColor: "#e2e8f0", margin: "20px 0" }} />
-
-          <Text
-            style={{
-              fontSize: "12px",
-              color: "#94a3b8",
-              margin: 0,
-            }}
-          >
-            Manage this appointment from your{" "}
-            {props.recipientRole === "professional"
-              ? "dashboard calendar"
-              : "client portal"}{" "}
-            at {props.appUrl}.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <BrandShell
+      professionalName={props.professionalName}
+      branding={props.branding}
+      appUrl={props.appUrl}
+      unsubscribeUrl={props.unsubscribeUrl}
+      locale={props.locale}
+      preview={t(`${intlKey}.preview`)}
+      heading={t(`${intlKey}.heading`)}
+      intro={t(`${intlKey}.body`, {
+        title: props.title,
+        date: dateLabel,
+        time: timeLabel,
+      })}
+      cta={
+        props.kind === "cancellation"
+          ? null
+          : { label: t(`${intlKey}.cta`), href: manageUrl }
+      }
+    >
+      <Section>
+        <Text style={{ margin: "6px 0", fontSize: "14px", color: "#0f172a" }}>
+          <strong>{firstName},</strong>
+        </Text>
+        <Row label="What" value={props.title} />
+        <Row label="With" value={counterparty} />
+        <Row label="When" value={`${dateLabel}, ${timeLabel}`} />
+        {props.location && <Row label="Where" value={props.location} />}
+        {props.notes && <Row label="Notes" value={props.notes} />}
+      </Section>
+    </BrandShell>
   )
 }
 

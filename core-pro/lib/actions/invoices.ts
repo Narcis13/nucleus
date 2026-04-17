@@ -22,6 +22,7 @@ import {
   sendInvoiceEmail,
   sendReceiptEmail,
 } from "@/lib/invoices/emails"
+import { trackServerEvent } from "@/lib/posthog/events"
 import type { InvoiceLineItem } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,6 +179,16 @@ export const createInvoiceAction = authedAction
     if (parsedInput.status === "sent") {
       void sendInvoiceEmail({ invoiceId: invoice.id }).catch(() => {})
     }
+
+    void trackServerEvent("invoice_created", {
+      distinctId: professional.clerkUserId,
+      professionalId: professional.id,
+      plan: professional.plan,
+      invoiceId: invoice.id,
+      total: totals.total,
+      currency: parsedInput.currency,
+      status: parsedInput.status,
+    })
 
     revalidatePath("/dashboard/invoices")
     return { id: invoice.id, invoiceNumber: invoice.invoiceNumber }

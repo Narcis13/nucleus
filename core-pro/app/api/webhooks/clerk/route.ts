@@ -14,6 +14,8 @@ import {
   professionalClients,
   professionals,
 } from "@/lib/db/schema"
+import { trackServerEvent } from "@/lib/posthog/events"
+import { identifyServer } from "@/lib/posthog/server"
 import { captureException } from "@/lib/sentry"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,7 +49,22 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (evt.type) {
-      case "user.created":
+      case "user.created": {
+        const row = await syncUserToSupabase(evt.data)
+        if (row) {
+          void identifyServer({
+            distinctId: row.clerkUserId,
+            properties: { plan: row.plan ?? "starter", role: "professional" },
+          })
+          void trackServerEvent("professional_signed_up", {
+            distinctId: row.clerkUserId,
+            professionalId: row.id,
+            plan: row.plan,
+          })
+        }
+        break
+      }
+
       case "user.updated": {
         await syncUserToSupabase(evt.data)
         break

@@ -19,7 +19,13 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type PortalNavItem = {
-  label: string
+  // A translation key under `portal.nav.*` in the messages bundles. Resolved
+  // by the nav component at render time so the sidebar re-labels itself when
+  // the locale changes, without the item list having to know about i18n.
+  labelKey: string
+  // Human-readable fallback used when a niche fork adds an item that isn't in
+  // the translation bundle yet.
+  fallbackLabel: string
   // Typed against Next's generated `AppRoutes` union (next.config.ts has
   // `typedRoutes: true`), so an invalid path would fail the build here.
   href: Route
@@ -28,18 +34,39 @@ export type PortalNavItem = {
 }
 
 export const PORTAL_NAV: PortalNavItem[] = [
-  { label: "Dashboard", href: "/portal", icon: Home },
-  { label: "Messages", href: "/portal/messages", icon: MessageCircle },
-  { label: "Documents", href: "/portal/documents", icon: FolderOpen },
-  { label: "Forms", href: "/portal/forms", icon: FileText },
-  { label: "Progress", href: "/portal/progress", icon: TrendingUp },
+  { labelKey: "home", fallbackLabel: "Home", href: "/portal", icon: Home },
+  {
+    labelKey: "messages",
+    fallbackLabel: "Messages",
+    href: "/portal/messages",
+    icon: MessageCircle,
+  },
+  {
+    labelKey: "documents",
+    fallbackLabel: "Documents",
+    href: "/portal/documents",
+    icon: FolderOpen,
+  },
+  {
+    labelKey: "forms",
+    fallbackLabel: "Forms",
+    href: "/portal/forms",
+    icon: FileText,
+  },
+  {
+    labelKey: "progress",
+    fallbackLabel: "Progress",
+    href: "/portal/progress",
+    icon: TrendingUp,
+  },
 ]
 
 // Niche extension slot — shown greyed-out until a specialized fork drops in a
 // real page and flips `placeholder` off.
 export const PORTAL_NICHE_NAV: PortalNavItem[] = [
   {
-    label: "Niche section",
+    labelKey: "niche",
+    fallbackLabel: "Niche section",
     href: "#" as Route,
     icon: Sparkles,
     placeholder: true,

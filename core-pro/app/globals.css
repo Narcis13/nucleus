@@ -123,10 +123,45 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent rubber-band overscroll revealing white on iOS PWAs. */
+    overscroll-behavior-y: none;
   }
   html {
     @apply font-sans;
   }
+
+  /* Render under the iOS status bar / Android nav bar when installed as a
+     PWA. Consumers opt-in with safe-area padding utilities below. */
+  @supports (padding: env(safe-area-inset-top)) {
+    html {
+      --safe-top: env(safe-area-inset-top);
+      --safe-right: env(safe-area-inset-right);
+      --safe-bottom: env(safe-area-inset-bottom);
+      --safe-left: env(safe-area-inset-left);
+    }
+  }
+
+  /* Touch targets: native tap highlight is distracting on dark themes and
+     makes the app feel less native. Our own :active and :focus-visible
+     styles handle feedback. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent iOS zooming on inputs by ensuring a ≥16px font size. */
+  @media (max-width: 640px) {
+    input, select, textarea {
+      font-size: 16px;
+    }
+  }
+
+  /* Safe-area helpers usable from className. `pb-safe` respects the home
+     indicator on iOS; bottom tab bars use `bottom-safe` to stay above it. */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .bottom-safe { bottom: env(safe-area-inset-bottom); }
 
   @media print {
     /* Hide app chrome so "Save as PDF" from the analytics page yields a clean

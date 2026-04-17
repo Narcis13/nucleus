@@ -1,11 +1,13 @@
 "use server"
 
+import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
 
 import { ActionError, authedAction } from "@/lib/actions/safe-action"
 import { evaluateTrigger } from "@/lib/automations/engine"
+import { trackServerEvent } from "@/lib/posthog/events"
 import {
   archiveForm as archiveFormQuery,
   assignFormToClients as assignFormQuery,
@@ -220,6 +222,17 @@ export const submitFormResponseAction = authedAction
       formId: assignment.formId,
       assignmentId: assignment.id,
     }).catch(() => {})
+
+    const { userId } = await auth()
+    if (userId) {
+      void trackServerEvent("form_submitted", {
+        distinctId: userId,
+        professionalId: assignment.professionalId,
+        formId: assignment.formId,
+        assignmentId: assignment.id,
+        clientId: assignment.clientId,
+      })
+    }
 
     revalidatePath("/portal/forms")
     revalidatePath(`/portal/forms/${assignment.id}`)

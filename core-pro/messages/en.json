@@ -1,0 +1,312 @@
+{
+  "common": {
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "add": "Add",
+    "remove": "Remove",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "continue": "Continue",
+    "loading": "Loading…",
+    "search": "Search",
+    "filter": "Filter",
+    "signOut": "Sign out",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "error": "Something went wrong",
+    "success": "Success",
+    "optional": "Optional",
+    "required": "Required",
+    "comingSoon": "Coming soon"
+  },
+  "locale": {
+    "label": "Language",
+    "ro": "Română",
+    "en": "English",
+    "switched": "Language updated"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "unauthorized": "You need to sign in to continue.",
+    "notFound": "We couldn't find that.",
+    "rateLimited": "Too many requests. Please slow down.",
+    "validation": "Some fields need your attention.",
+    "network": "Network issue — check your connection."
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Enter a valid email address",
+    "url": "Enter a valid URL",
+    "min": "Must be at least {min} characters",
+    "max": "Must be at most {max} characters",
+    "number": "Enter a valid number"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back",
+    "nav": {
+      "home": "Home",
+      "clients": "Clients",
+      "leads": "Leads",
+      "calendar": "Calendar",
+      "messages": "Messages",
+      "forms": "Forms",
+      "documents": "Documents",
+      "invoices": "Invoices",
+      "services": "Services",
+      "notifications": "Notifications",
+      "automations": "Automations",
+      "marketing": "Marketing",
+      "siteBuilder": "Site builder",
+      "analytics": "Analytics",
+      "settings": "Settings"
+    },
+    "clients": {
+      "title": "Clients",
+      "description": "Everyone you work with, in one place.",
+      "empty": "No clients yet. Invite your first one.",
+      "invite": "Invite client",
+      "search": "Search clients"
+    },
+    "leads": {
+      "title": "Leads",
+      "description": "People who reached out — convert them into clients.",
+      "empty": "No leads yet."
+    },
+    "calendar": {
+      "title": "Calendar",
+      "description": "Your bookings and availability."
+    },
+    "messages": {
+      "title": "Messages",
+      "description": "Conversations with your clients.",
+      "empty": "No conversations yet."
+    },
+    "invoices": {
+      "title": "Invoices",
+      "description": "Create, send, and track invoices."
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Workspace preferences.",
+      "profile": {
+        "title": "Professional profile",
+        "description": "Your name, photo, and bio are shown on the client portal and any published micro-site.",
+        "fullName": "Full name",
+        "phone": "Phone",
+        "bio": "Short bio",
+        "bioPlaceholder": "One or two paragraphs shown on your micro-site.",
+        "uploadPhoto": "Upload photo",
+        "replacePhoto": "Replace photo",
+        "photoHint": "PNG, JPG, WebP or GIF. Up to 5 MB.",
+        "specializations": "Specializations",
+        "certifications": "Certifications",
+        "saveProfile": "Save profile",
+        "saved": "Profile saved",
+        "saveError": "Couldn't save profile"
+      },
+      "locale": {
+        "title": "Locale",
+        "description": "Controls the default timezone, language, and currency we use for your invoices, reminders, and calendar feed.",
+        "timezone": "Timezone",
+        "timezoneHint": "IANA name, e.g. Europe/Bucharest.",
+        "language": "Language",
+        "languageHint": "The app UI will switch to this language.",
+        "currency": "Currency",
+        "currencyHint": "ISO 4217, e.g. EUR, RON."
+      }
+    }
+  },
+  "portal": {
+    "title": "Your portal",
+    "welcome": "Welcome back",
+    "welcomeDescription": "Your upcoming sessions, messages, and latest updates will live here.",
+    "ready": "Your portal is ready",
+    "readyDescription": "As your professional shares documents, forms, or messages with you, they'll appear on this page.",
+    "nav": {
+      "home": "Home",
+      "messages": "Messages",
+      "forms": "Forms",
+      "documents": "Documents",
+      "progress": "Progress"
+    },
+    "header": {
+      "defaultWorkspace": "Your workspace",
+      "accountMenu": "Account menu",
+      "profile": "Profile",
+      "signOut": "Sign out"
+    },
+    "messages": {
+      "title": "Messages",
+      "empty": "No messages yet."
+    },
+    "documents": {
+      "title": "Documents",
+      "empty": "No documents shared yet."
+    },
+    "forms": {
+      "title": "Forms",
+      "empty": "No forms assigned."
+    },
+    "progress": {
+      "title": "Progress",
+      "empty": "Nothing to track yet."
+    }
+  },
+  "microSite": {
+    "hero": {
+      "bookNow": "Book a session",
+      "contact": "Contact"
+    },
+    "about": {
+      "title": "About"
+    },
+    "services": {
+      "title": "Services",
+      "bookCta": "Book"
+    },
+    "contact": {
+      "title": "Get in touch",
+      "namePlaceholder": "Your name",
+      "emailPlaceholder": "Your email",
+      "messagePlaceholder": "Tell me a bit about what you need",
+      "submit": "Send",
+      "success": "Thanks — I'll be in touch shortly.",
+      "error": "Couldn't send your message. Please try again."
+    },
+    "footer": {
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "poweredBy": "Powered by CorePro"
+    }
+  },
+  "emails": {
+    "common": {
+      "greeting": "Hi {name},",
+      "signOff": "— {sender}",
+      "openInBrowser": "Open in browser",
+      "poweredBy": "Sent via CorePro"
+    },
+    "welcome": {
+      "subject": "Welcome to {workspace}",
+      "preview": "Your workspace is ready.",
+      "heading": "Welcome, {name}",
+      "body": "Thanks for joining {workspace}. You can sign in any time to your client portal.",
+      "cta": "Open portal"
+    },
+    "invitation": {
+      "subject": "{sender} invited you to {workspace}",
+      "preview": "You've been invited to join the portal.",
+      "heading": "You're invited",
+      "body": "{sender} has invited you to collaborate on {workspace}. Click below to accept.",
+      "cta": "Accept invite"
+    },
+    "clientInvitation": {
+      "subject": "{sender} invited you as a client",
+      "preview": "Set up your client portal.",
+      "heading": "You're invited as a client",
+      "body": "{sender} uses CorePro to coordinate sessions, documents, and messages with their clients. Accept the invite to get started.",
+      "cta": "Accept invite"
+    },
+    "appointmentReminder": {
+      "subject": "Reminder: {title} on {date}",
+      "preview": "Your appointment is coming up.",
+      "heading": "Upcoming appointment",
+      "body": "This is a friendly reminder about {title} on {date} at {time}.",
+      "cta": "View details"
+    },
+    "appointmentConfirmation": {
+      "subject": "Confirmed: {title} on {date}",
+      "preview": "Your appointment is confirmed.",
+      "heading": "Appointment confirmed",
+      "body": "{title} is confirmed for {date} at {time}.",
+      "cta": "Add to calendar"
+    },
+    "formAssigned": {
+      "subject": "New form to fill out: {formTitle}",
+      "preview": "A new form is waiting for you.",
+      "heading": "New form assigned",
+      "body": "{sender} has shared a form with you: {formTitle}. Fill it out whenever you have a moment.",
+      "cta": "Open form"
+    },
+    "newMessage": {
+      "subject": "New message from {sender}",
+      "preview": "You have a new message.",
+      "heading": "New message",
+      "body": "{sender} sent you a new message in your portal.",
+      "cta": "Read message"
+    },
+    "invoice": {
+      "subject": "Invoice {number} from {sender}",
+      "preview": "Your invoice is ready.",
+      "heading": "Invoice {number}",
+      "body": "Here is invoice {number} for {amount}. You can pay securely with the link below.",
+      "cta": "View invoice",
+      "pay": "Pay invoice"
+    },
+    "invoiceSent": {
+      "subject": "Invoice {number} sent",
+      "preview": "Your invoice was sent.",
+      "heading": "Invoice {number} sent",
+      "body": "We've sent invoice {number} for {amount} to {recipient}.",
+      "cta": "View invoice"
+    },
+    "invoiceReminder": {
+      "subject": "Reminder: invoice {number} is due",
+      "preview": "Friendly reminder about your invoice.",
+      "heading": "Invoice reminder",
+      "body": "Just a gentle reminder — invoice {number} for {amount} is due on {dueDate}.",
+      "cta": "Pay invoice"
+    },
+    "leadNotification": {
+      "subject": "New lead: {name}",
+      "preview": "A new lead reached out.",
+      "heading": "New lead",
+      "body": "{name} ({email}) just submitted your contact form.",
+      "cta": "Open lead"
+    },
+    "weeklySummary": {
+      "subject": "Your week in numbers",
+      "preview": "Here's how last week went.",
+      "heading": "Weekly summary",
+      "body": "Here's a quick roll-up of your last 7 days.",
+      "cta": "Open dashboard"
+    },
+    "gdprExport": {
+      "subject": "Your data export is ready",
+      "preview": "Download your data.",
+      "heading": "Data export ready",
+      "body": "Your personal-data export is available below. The link expires in 24 hours.",
+      "cta": "Download export"
+    },
+    "notification": {
+      "subject": "{title}",
+      "preview": "You have a new notification.",
+      "heading": "{title}",
+      "cta": "Open"
+    }
+  },
+  "notifications": {
+    "channels": {
+      "in_app": "In-app",
+      "email": "Email",
+      "sms": "SMS",
+      "push": "Push"
+    },
+    "types": {
+      "appointment_reminder": "Appointment reminder",
+      "new_message": "New message",
+      "form_assigned": "Form assigned",
+      "invoice_sent": "Invoice sent",
+      "invoice_paid": "Invoice paid",
+      "lead_received": "New lead"
+    }
+  }
+}

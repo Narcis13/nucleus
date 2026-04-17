@@ -15,8 +15,9 @@ import {
 } from "@/lib/db/queries/invoices"
 import { sendNotification } from "@/lib/notifications/send"
 import { fromAddress, getResend } from "@/lib/resend/client"
+import { makeEmailTranslator } from "@/lib/resend/translator"
 import { captureException } from "@/lib/sentry"
-import type { Invoice, InvoiceLineItem } from "@/types/domain"
+import type { Branding, Invoice, InvoiceLineItem } from "@/types/domain"
 
 import InvoiceEmail, {
   type InvoiceEmailKind,
@@ -37,8 +38,14 @@ import InvoiceEmail, {
 
 type InvoiceContext = {
   invoice: Invoice
-  client: { id: string; email: string; fullName: string } | null
-  professional: { id: string; email: string; fullName: string }
+  client: { id: string; email: string; fullName: string; locale: string | null } | null
+  professional: {
+    id: string
+    email: string
+    fullName: string
+    branding: Branding | null
+    locale: string | null
+  }
 }
 
 async function fetchInvoiceContext(
@@ -51,11 +58,14 @@ async function fetchInvoiceContext(
         id: clients.id,
         email: clients.email,
         fullName: clients.fullName,
+        locale: clients.locale,
       },
       professional: {
         id: professionals.id,
         email: professionals.email,
         fullName: professionals.fullName,
+        branding: professionals.branding,
+        locale: professionals.locale,
       },
     })
     .from(invoices)
@@ -68,7 +78,13 @@ async function fetchInvoiceContext(
   return {
     invoice: row.invoice,
     client: row.client?.id ? row.client : null,
-    professional: row.professional,
+    professional: {
+      id: row.professional.id,
+      email: row.professional.email,
+      fullName: row.professional.fullName,
+      branding: (row.professional.branding ?? null) as Branding | null,
+      locale: row.professional.locale ?? null,
+    },
   }
 }
 
@@ -76,18 +92,24 @@ function portalUrlFor(invoice: Invoice): string {
   return `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/portal/invoices/${invoice.id}`
 }
 
-function subjectFor(kind: InvoiceEmailKind, invoice: Invoice): string {
+function subjectFor(
+  kind: InvoiceEmailKind,
+  invoice: Invoice,
+  locale: string | null,
+): string {
+  const t = makeEmailTranslator(locale)
   switch (kind) {
     case "issued":
-      return `Invoice ${invoice.invoiceNumber}`
-    case "reminder_friendly":
-      return `Reminder: Invoice ${invoice.invoiceNumber}`
-    case "reminder_firm":
-      return `Overdue: Invoice ${invoice.invoiceNumber}`
-    case "reminder_final":
-      return `Final notice: Invoice ${invoice.invoiceNumber}`
+      return t("emails.invoice.subject", {
+        number: invoice.invoiceNumber,
+        sender: "",
+      }).replace(/ $/, "")
     case "receipt":
-      return `Receipt for Invoice ${invoice.invoiceNumber}`
+      return t("emails.invoiceSent.subject", { number: invoice.invoiceNumber })
+    default:
+      return t("emails.invoiceReminder.subject", {
+        number: invoice.invoiceNumber,
+      })
   }
 }
 
@@ -111,6 +133,9 @@ function propsForInvoice(
     invoiceNumber: ctx.invoice.invoiceNumber,
     recipientName: ctx.client?.fullName ?? "there",
     professionalName: ctx.professional.fullName,
+    branding: ctx.professional.branding,
+    appUrl: env.NEXT_PUBLIC_APP_URL,
+    locale: ctx.client?.locale ?? ctx.professional.locale ?? null,
     lineItems: mapped,
     subtotal: Number(ctx.invoice.subtotal),
     taxAmount: Number(ctx.invoice.taxAmount),
@@ -145,10 +170,12 @@ async function dispatch(
     const html = await render(
       InvoiceEmail(propsForInvoice(ctx, kind, options.daysOverdue ?? null)),
     )
+    const recipientLocale =
+      ctx.client?.locale ?? ctx.professional.locale ?? null
     await resend.emails.send({
       from: fromAddress(),
       to: [recipient],
-      subject: subjectFor(kind, ctx.invoice),
+      subject: subjectFor(kind, ctx.invoice, recipientLocale),
       html,
     })
     return { sent: true }

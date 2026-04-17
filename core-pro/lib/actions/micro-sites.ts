@@ -19,6 +19,7 @@ import {
 } from "@/lib/db/queries/micro-sites"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { leadActivities, leadStages, leads } from "@/lib/db/schema"
+import { trackServerEvent } from "@/lib/posthog/events"
 import { publicFormRateLimit } from "@/lib/ratelimit"
 import type {
   MicroSiteConfig,
@@ -239,6 +240,18 @@ export const publishMicroSiteAction = authedAction
 
     const updated = await updateMicroSite({ isPublished: parsedInput.publish })
     if (!updated) throw new ActionError("Couldn't update publish state.")
+
+    // Only the publish transition matters for the funnel — unpublishing isn't
+    // tracked. Firing on every toggle would skew the funnel with edit churn.
+    if (parsedInput.publish) {
+      void trackServerEvent("micro_site_published", {
+        distinctId: professional.clerkUserId,
+        professionalId: professional.id,
+        plan: professional.plan,
+        siteId: updated.id,
+        slug: updated.slug,
+      })
+    }
 
     revalidatePath("/dashboard/site-builder")
     revalidatePath(`/${site.slug}`)

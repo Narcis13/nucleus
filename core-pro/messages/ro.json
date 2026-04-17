@@ -1,0 +1,312 @@
+{
+  "common": {
+    "save": "Salvează",
+    "saving": "Se salvează…",
+    "cancel": "Anulează",
+    "delete": "Șterge",
+    "edit": "Editează",
+    "create": "Creează",
+    "add": "Adaugă",
+    "remove": "Elimină",
+    "close": "Închide",
+    "confirm": "Confirmă",
+    "back": "Înapoi",
+    "next": "Următorul",
+    "continue": "Continuă",
+    "loading": "Se încarcă…",
+    "search": "Caută",
+    "filter": "Filtrează",
+    "signOut": "Deconectare",
+    "yes": "Da",
+    "no": "Nu",
+    "ok": "OK",
+    "error": "A apărut o problemă",
+    "success": "Succes",
+    "optional": "Opțional",
+    "required": "Obligatoriu",
+    "comingSoon": "În curând"
+  },
+  "locale": {
+    "label": "Limbă",
+    "ro": "Română",
+    "en": "English",
+    "switched": "Limbă actualizată"
+  },
+  "errors": {
+    "generic": "A apărut o problemă. Te rugăm să încerci din nou.",
+    "unauthorized": "Trebuie să te conectezi pentru a continua.",
+    "notFound": "Nu am putut găsi asta.",
+    "rateLimited": "Prea multe cereri. Te rugăm să încetinești.",
+    "validation": "Verifică câmpurile.",
+    "network": "Problemă de rețea — verifică-ți conexiunea."
+  },
+  "validation": {
+    "required": "Câmp obligatoriu",
+    "email": "Introdu o adresă de email validă",
+    "url": "Introdu o adresă URL validă",
+    "min": "Trebuie să aibă cel puțin {min} caractere",
+    "max": "Trebuie să aibă cel mult {max} caractere",
+    "number": "Introdu un număr valid"
+  },
+  "dashboard": {
+    "title": "Panou",
+    "welcome": "Bine ai revenit",
+    "nav": {
+      "home": "Acasă",
+      "clients": "Clienți",
+      "leads": "Oportunități",
+      "calendar": "Calendar",
+      "messages": "Mesaje",
+      "forms": "Formulare",
+      "documents": "Documente",
+      "invoices": "Facturi",
+      "services": "Servicii",
+      "notifications": "Notificări",
+      "automations": "Automatizări",
+      "marketing": "Marketing",
+      "siteBuilder": "Construire site",
+      "analytics": "Analiză",
+      "settings": "Setări"
+    },
+    "clients": {
+      "title": "Clienți",
+      "description": "Toți oamenii cu care lucrezi, într-un singur loc.",
+      "empty": "Încă nu ai clienți. Invită primul client.",
+      "invite": "Invită client",
+      "search": "Caută clienți"
+    },
+    "leads": {
+      "title": "Oportunități",
+      "description": "Oameni care te-au contactat — transformă-i în clienți.",
+      "empty": "Încă nu ai oportunități."
+    },
+    "calendar": {
+      "title": "Calendar",
+      "description": "Programările și disponibilitatea ta."
+    },
+    "messages": {
+      "title": "Mesaje",
+      "description": "Conversații cu clienții tăi.",
+      "empty": "Încă nu ai conversații."
+    },
+    "invoices": {
+      "title": "Facturi",
+      "description": "Creează, trimite și urmărește facturi."
+    },
+    "settings": {
+      "title": "Setări",
+      "description": "Preferințele spațiului de lucru.",
+      "profile": {
+        "title": "Profilul profesionistului",
+        "description": "Numele, fotografia și descrierea sunt afișate în portalul clienților și pe micro-site-ul publicat.",
+        "fullName": "Nume complet",
+        "phone": "Telefon",
+        "bio": "Scurtă descriere",
+        "bioPlaceholder": "Unul sau două paragrafe afișate pe micro-site-ul tău.",
+        "uploadPhoto": "Încarcă fotografia",
+        "replacePhoto": "Înlocuiește fotografia",
+        "photoHint": "PNG, JPG, WebP sau GIF. Până la 5 MB.",
+        "specializations": "Specializări",
+        "certifications": "Certificări",
+        "saveProfile": "Salvează profilul",
+        "saved": "Profil salvat",
+        "saveError": "Profilul nu a putut fi salvat"
+      },
+      "locale": {
+        "title": "Localizare",
+        "description": "Controlează fusul orar, limba și moneda implicite folosite pentru facturi, notificări și calendar.",
+        "timezone": "Fus orar",
+        "timezoneHint": "Nume IANA, ex. Europe/Bucharest.",
+        "language": "Limbă",
+        "languageHint": "Interfața aplicației va comuta pe această limbă.",
+        "currency": "Monedă",
+        "currencyHint": "ISO 4217, ex. EUR, RON."
+      }
+    }
+  },
+  "portal": {
+    "title": "Portalul tău",
+    "welcome": "Bine ai revenit",
+    "welcomeDescription": "Ședințele viitoare, mesajele și noutățile tale vor apărea aici.",
+    "ready": "Portalul tău este pregătit",
+    "readyDescription": "Pe măsură ce profesionistul tău partajează documente, formulare sau mesaje, acestea vor apărea pe această pagină.",
+    "nav": {
+      "home": "Acasă",
+      "messages": "Mesaje",
+      "forms": "Formulare",
+      "documents": "Documente",
+      "progress": "Progres"
+    },
+    "header": {
+      "defaultWorkspace": "Spațiul tău",
+      "accountMenu": "Meniul contului",
+      "profile": "Profil",
+      "signOut": "Deconectare"
+    },
+    "messages": {
+      "title": "Mesaje",
+      "empty": "Încă nu ai mesaje."
+    },
+    "documents": {
+      "title": "Documente",
+      "empty": "Încă nu au fost partajate documente."
+    },
+    "forms": {
+      "title": "Formulare",
+      "empty": "Nu ai formulare de completat."
+    },
+    "progress": {
+      "title": "Progres",
+      "empty": "Momentan nu există progres de urmărit."
+    }
+  },
+  "microSite": {
+    "hero": {
+      "bookNow": "Programează o ședință",
+      "contact": "Contact"
+    },
+    "about": {
+      "title": "Despre"
+    },
+    "services": {
+      "title": "Servicii",
+      "bookCta": "Programează"
+    },
+    "contact": {
+      "title": "Ia legătura",
+      "namePlaceholder": "Numele tău",
+      "emailPlaceholder": "Email-ul tău",
+      "messagePlaceholder": "Spune-mi pe scurt ce-ți trebuie",
+      "submit": "Trimite",
+      "success": "Mulțumesc — te contactez în curând.",
+      "error": "Nu am putut trimite mesajul. Te rog încearcă din nou."
+    },
+    "footer": {
+      "privacy": "Confidențialitate",
+      "terms": "Termeni",
+      "poweredBy": "Găzduit prin CorePro"
+    }
+  },
+  "emails": {
+    "common": {
+      "greeting": "Salut {name},",
+      "signOff": "— {sender}",
+      "openInBrowser": "Deschide în browser",
+      "poweredBy": "Trimis prin CorePro"
+    },
+    "welcome": {
+      "subject": "Bun venit la {workspace}",
+      "preview": "Spațiul tău de lucru este gata.",
+      "heading": "Bun venit, {name}",
+      "body": "Mulțumim că te-ai alăturat {workspace}. Te poți conecta oricând la portalul tău.",
+      "cta": "Deschide portalul"
+    },
+    "invitation": {
+      "subject": "{sender} te-a invitat la {workspace}",
+      "preview": "Ai fost invitat să te alături portalului.",
+      "heading": "Ai primit o invitație",
+      "body": "{sender} te-a invitat să colaborezi la {workspace}. Apasă mai jos pentru a accepta.",
+      "cta": "Acceptă invitația"
+    },
+    "clientInvitation": {
+      "subject": "{sender} te-a invitat ca și client",
+      "preview": "Configurează-ți portalul de client.",
+      "heading": "Ești invitat ca și client",
+      "body": "{sender} folosește CorePro pentru a coordona ședințele, documentele și mesajele cu clienții. Acceptă invitația pentru a începe.",
+      "cta": "Acceptă invitația"
+    },
+    "appointmentReminder": {
+      "subject": "Reminder: {title} pe {date}",
+      "preview": "Urmează o programare.",
+      "heading": "Programare apropiată",
+      "body": "Acesta este un reminder prietenesc despre {title} pe {date} la ora {time}.",
+      "cta": "Vezi detalii"
+    },
+    "appointmentConfirmation": {
+      "subject": "Confirmat: {title} pe {date}",
+      "preview": "Programarea ta este confirmată.",
+      "heading": "Programare confirmată",
+      "body": "{title} este confirmată pentru {date} la ora {time}.",
+      "cta": "Adaugă în calendar"
+    },
+    "formAssigned": {
+      "subject": "Formular nou de completat: {formTitle}",
+      "preview": "Un formular nou te așteaptă.",
+      "heading": "Formular nou asignat",
+      "body": "{sender} a partajat un formular cu tine: {formTitle}. Completează-l când ai un moment.",
+      "cta": "Deschide formularul"
+    },
+    "newMessage": {
+      "subject": "Mesaj nou de la {sender}",
+      "preview": "Ai un mesaj nou.",
+      "heading": "Mesaj nou",
+      "body": "{sender} ți-a trimis un mesaj nou în portal.",
+      "cta": "Citește mesajul"
+    },
+    "invoice": {
+      "subject": "Factura {number} de la {sender}",
+      "preview": "Factura ta este gata.",
+      "heading": "Factura {number}",
+      "body": "Iată factura {number} în valoare de {amount}. Poți plăti în siguranță folosind linkul de mai jos.",
+      "cta": "Vezi factura",
+      "pay": "Plătește factura"
+    },
+    "invoiceSent": {
+      "subject": "Factura {number} a fost trimisă",
+      "preview": "Factura ta a fost trimisă.",
+      "heading": "Factura {number} trimisă",
+      "body": "Am trimis factura {number} în valoare de {amount} către {recipient}.",
+      "cta": "Vezi factura"
+    },
+    "invoiceReminder": {
+      "subject": "Reminder: factura {number} este scadentă",
+      "preview": "Reminder prietenesc despre factura ta.",
+      "heading": "Reminder factură",
+      "body": "Un reminder prietenesc — factura {number} în valoare de {amount} este scadentă pe {dueDate}.",
+      "cta": "Plătește factura"
+    },
+    "leadNotification": {
+      "subject": "Oportunitate nouă: {name}",
+      "preview": "O oportunitate nouă te-a contactat.",
+      "heading": "Oportunitate nouă",
+      "body": "{name} ({email}) tocmai a trimis formularul tău de contact.",
+      "cta": "Deschide oportunitatea"
+    },
+    "weeklySummary": {
+      "subject": "Săptămâna ta în cifre",
+      "preview": "Cum a fost săptămâna trecută.",
+      "heading": "Rezumat săptămânal",
+      "body": "Iată un rezumat rapid al ultimelor 7 zile.",
+      "cta": "Deschide panoul"
+    },
+    "gdprExport": {
+      "subject": "Exportul tău de date este gata",
+      "preview": "Descarcă-ți datele.",
+      "heading": "Export de date gata",
+      "body": "Exportul datelor tale personale este disponibil mai jos. Linkul expiră în 24 de ore.",
+      "cta": "Descarcă exportul"
+    },
+    "notification": {
+      "subject": "{title}",
+      "preview": "Ai o notificare nouă.",
+      "heading": "{title}",
+      "cta": "Deschide"
+    }
+  },
+  "notifications": {
+    "channels": {
+      "in_app": "În aplicație",
+      "email": "Email",
+      "sms": "SMS",
+      "push": "Push"
+    },
+    "types": {
+      "appointment_reminder": "Reminder programare",
+      "new_message": "Mesaj nou",
+      "form_assigned": "Formular asignat",
+      "invoice_sent": "Factură trimisă",
+      "invoice_paid": "Factură achitată",
+      "lead_received": "Oportunitate nouă"
+    }
+  }
+}

@@ -3,6 +3,7 @@
 import type { Route } from "next"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
 
@@ -38,6 +39,7 @@ export function PortalNav({
 }: PortalNavProps) {
   const pathname = usePathname() ?? ""
   const isVertical = orientation === "vertical"
+  const t = useTranslations("portal.nav")
 
   const items = isVertical ? [...PORTAL_NAV, ...PORTAL_NICHE_NAV] : PORTAL_NAV
 
@@ -55,6 +57,7 @@ export function PortalNav({
         <PortalNavLink
           key={item.href}
           item={item}
+          label={translateNav(t, item)}
           pathname={pathname}
           vertical={isVertical}
           onNavigate={onNavigate}
@@ -64,13 +67,28 @@ export function PortalNav({
   )
 }
 
+// Resolve the nav label via translations, falling back to the item's baked-in
+// English string when a niche fork introduces a key the bundle doesn't cover.
+function translateNav(
+  t: ReturnType<typeof useTranslations>,
+  item: PortalNavItem,
+): string {
+  try {
+    return t(item.labelKey)
+  } catch {
+    return item.fallbackLabel
+  }
+}
+
 function PortalNavLink({
   item,
+  label,
   pathname,
   vertical,
   onNavigate,
 }: {
   item: PortalNavItem
+  label: string
   pathname: string
   vertical: boolean
   onNavigate?: () => void
@@ -92,7 +110,7 @@ function PortalNavLink({
     <>
       <Icon className="size-4 shrink-0" aria-hidden />
       <span className={cn("truncate", !vertical && "hidden lg:inline")}>
-        {item.label}
+        {label}
       </span>
     </>
   )

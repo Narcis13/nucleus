@@ -1,18 +1,20 @@
 import { Home } from "lucide-react"
+import { getTranslations } from "next-intl/server"
 
 import { EmptyState, PageHeader } from "@/components/shared/page-header"
 
-export default function PortalHomePage() {
+export default async function PortalHomePage() {
+  const t = await getTranslations("portal")
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Welcome back"
-        description="Your upcoming sessions, messages, and latest updates will live here."
+        title={t("welcome")}
+        description={t("welcomeDescription")}
       />
       <EmptyState
         icon={<Home />}
-        title="Your portal is ready"
-        description="As your professional shares documents, forms, or messages with you, they'll appear on this page."
+        title={t("ready")}
+        description={t("readyDescription")}
       />
     </div>
   )

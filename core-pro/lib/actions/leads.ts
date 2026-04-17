@@ -23,6 +23,7 @@ import {
   updateStage as updateStageQuery,
 } from "@/lib/db/queries/leads"
 import { getProfessional } from "@/lib/db/queries/professionals"
+import { trackServerEvent } from "@/lib/posthog/events"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemas
@@ -134,6 +135,14 @@ export const createLeadAction = authedAction
       leadId: created.id,
     }).catch(() => {})
 
+    void trackServerEvent("lead_created", {
+      distinctId: professional.clerkUserId,
+      professionalId: professional.id,
+      plan: professional.plan,
+      leadId: created.id,
+      source: parsedInput.source || null,
+    })
+
     revalidatePath("/dashboard/leads")
     return { id: created.id, stageId }
   })
@@ -186,8 +195,18 @@ export const convertLeadToClientAction = authedAction
   .metadata({ actionName: "leads.convert" })
   .inputSchema(idSchema)
   .action(async ({ parsedInput }) => {
+    const professional = await getProfessional()
     const result = await convertLeadToClientQuery(parsedInput.id)
     if (!result) throw new ActionError("Lead not found.")
+    if (professional) {
+      void trackServerEvent("lead_converted", {
+        distinctId: professional.clerkUserId,
+        professionalId: professional.id,
+        plan: professional.plan,
+        leadId: result.leadId,
+        clientId: result.clientId,
+      })
+    }
     revalidatePath("/dashboard/leads")
     revalidatePath("/dashboard/clients")
     return result
