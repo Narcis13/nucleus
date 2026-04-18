@@ -191,6 +191,7 @@ export function AvailabilityEditor({
                           variant="ghost"
                           size="icon-sm"
                           className="ml-auto"
+                          aria-label="Remove availability window"
                           onClick={() =>
                             setRows((prev) => prev.filter((x) => x.id !== r.id))
                           }

@@ -100,7 +100,7 @@ export function useMessages(
   useEffect(() => {
     if (!conversationId) return
     const channel = supabase
-      .channel(`messages:${conversationId}`)
+      .channel(`messages:${conversationId}:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         {
@@ -177,7 +177,7 @@ export function useConversations(filter: ConversationsFilter): {
       : `client_id=eq.${clientId}`
 
     const channel = supabase
-      .channel(`conversations:${professionalId ?? clientId}`)
+      .channel(`conversations:${professionalId ?? clientId}:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         {

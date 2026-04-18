@@ -106,7 +106,7 @@ export default async function BillingPage({
       <Card>
         <CardHeader>
           <CardTitle>Usage</CardTitle>
-          <CardDescription>How much of your plan you've used this period.</CardDescription>
+          <CardDescription>How much of your plan you&rsquo;ve used this period.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <UsageMeter
@@ -129,7 +129,7 @@ export default async function BillingPage({
           <CardHeader>
             <CardTitle>Change plan</CardTitle>
             <CardDescription>
-              Upgrade or downgrade at any time — you'll be prorated for the difference.
+              Upgrade or downgrade at any time — you&rsquo;ll be prorated for the difference.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">

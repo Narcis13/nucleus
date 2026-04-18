@@ -87,6 +87,7 @@ export default function PricingPage() {
               {plan.id === "enterprise" ? (
                 <Button
                   className="w-full"
+                  nativeButton={false}
                   render={<Link href="mailto:sales@corepro.app" />}
                 >
                   Contact sales

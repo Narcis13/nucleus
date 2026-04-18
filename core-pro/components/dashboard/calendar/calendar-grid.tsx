@@ -158,6 +158,7 @@ export function CalendarGrid({
             type="button"
             variant="ghost"
             size="icon-sm"
+            aria-label="Previous period"
             onClick={() => setAnchor((a) => shift(a, view, -1))}
           >
             <ChevronLeft />
@@ -166,6 +167,7 @@ export function CalendarGrid({
             type="button"
             variant="ghost"
             size="icon-sm"
+            aria-label="Next period"
             onClick={() => setAnchor((a) => shift(a, view, 1))}
           >
             <ChevronRight />

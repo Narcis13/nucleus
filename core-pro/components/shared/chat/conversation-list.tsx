@@ -69,6 +69,7 @@ export function ConversationList({
         <Search className="size-4 text-muted-foreground" aria-hidden />
         <Input
           type="search"
+          aria-label="Search conversations"
           placeholder="Search conversations"
           value={query}
           onChange={(event) => setQuery(event.target.value)}

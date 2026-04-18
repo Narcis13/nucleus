@@ -35,6 +35,7 @@ export default function Error({
         <Button onClick={reset}>Try again</Button>
         <Button
           variant="outline"
+          nativeButton={false}
           render={<a href="mailto:support@corepro.app" />}
         >
           Contact support

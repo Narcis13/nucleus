@@ -45,8 +45,12 @@ export function useUnreadMessages(): number {
 
     void refresh()
 
+    // Unique per effect invocation — React 19 dev strict-mode double-mounts
+    // re-run this effect before the cleanup's async removeChannel completes.
+    // A shared channel name would collide (Supabase returns the already-
+    // subscribed instance, and .on() after subscribe() throws).
     const channel = supabase
-      .channel(`unread-messages:${role}`)
+      .channel(`unread-messages:${role}:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },

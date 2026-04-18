@@ -7,6 +7,7 @@ import { PostHogProvider } from "@/components/providers/posthog-provider"
 import { PostHogPageview } from "@/components/providers/posthog-pageview"
 import { PostHogIdentify } from "@/components/providers/posthog-identify"
 import { PwaProvider } from "@/components/shared/pwa/pwa-provider"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -68,6 +69,7 @@ export default async function RootLayout({
               <PostHogIdentify />
               <PwaProvider />
               {children}
+              <Toaster position="top-right" richColors closeButton />
             </PostHogProvider>
           </NextIntlClientProvider>
         </body>

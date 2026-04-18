@@ -36,10 +36,17 @@ export async function getLocaleCookie(): Promise<Locale | null> {
 }
 
 // Ensure a DB-persisted locale (professional or client) ends up in the cookie,
-// but never overwrite an explicit choice the user already made.
+// but never overwrite an explicit choice the user already made. Safe to call
+// from Server Components: Next.js forbids cookie writes outside actions/route
+// handlers, so we swallow that specific failure — the next action/route call
+// will re-sync. The DB value remains the source of truth either way.
 export async function syncLocaleFromDb(dbLocale: string | null | undefined) {
   const existing = await getLocaleCookie()
   if (existing) return
   const next = normalizeLocale(dbLocale ?? DEFAULT_LOCALE)
-  await setLocaleCookie(next)
+  try {
+    await setLocaleCookie(next)
+  } catch {
+    // Rendering in a Server Component — cookie write unavailable. No-op.
+  }
 }

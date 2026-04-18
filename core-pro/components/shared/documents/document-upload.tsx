@@ -322,6 +322,7 @@ export function DocumentUpload({
               <Button
                 variant="ghost"
                 size="icon-sm"
+                aria-label="Remove from upload queue"
                 onClick={() => removeFromQueue(item.id)}
                 disabled={item.status === "uploading"}
               >

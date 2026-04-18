@@ -24,66 +24,20 @@ import {
 // enforced by policy. Numeric columns (`invoices.total`, `invoices.paid_amount`)
 // are cast to float8 so postgres.js hands them back as JS numbers rather than
 // strings.
+//
+// Date-range presets + `resolveRange` live in `./range` so client components
+// (date pickers) can import them without transitively dragging `postgres`
+// into the browser bundle.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type DateRange = {
-  from: Date
-  to: Date
-}
+export {
+  RANGE_PRESETS,
+  resolveRange,
+  type DateRange,
+  type RangePreset,
+} from "./range"
 
-export type RangePreset = "week" | "month" | "quarter" | "year" | "custom"
-
-export const RANGE_PRESETS: Array<{ value: RangePreset; label: string }> = [
-  { value: "week", label: "This week" },
-  { value: "month", label: "This month" },
-  { value: "quarter", label: "This quarter" },
-  { value: "year", label: "This year" },
-  { value: "custom", label: "Custom" },
-]
-
-// Resolve a preset to an absolute [from, to) window anchored on now.
-export function resolveRange(
-  preset: RangePreset,
-  custom?: { from?: string; to?: string },
-): DateRange {
-  const now = new Date()
-  const to = new Date(now)
-  to.setHours(23, 59, 59, 999)
-  const from = new Date(now)
-  from.setHours(0, 0, 0, 0)
-
-  if (preset === "week") {
-    const day = from.getDay() // 0 Sun…6 Sat
-    const offset = day === 0 ? 6 : day - 1 // week starts Monday
-    from.setDate(from.getDate() - offset)
-  } else if (preset === "month") {
-    from.setDate(1)
-  } else if (preset === "quarter") {
-    const q = Math.floor(from.getMonth() / 3)
-    from.setMonth(q * 3, 1)
-  } else if (preset === "year") {
-    from.setMonth(0, 1)
-  } else if (preset === "custom") {
-    if (custom?.from) {
-      const parsed = new Date(custom.from)
-      if (!Number.isNaN(parsed.getTime())) {
-        parsed.setHours(0, 0, 0, 0)
-        return {
-          from: parsed,
-          to: custom.to
-            ? (() => {
-                const t = new Date(custom.to)
-                t.setHours(23, 59, 59, 999)
-                return t
-              })()
-            : to,
-        }
-      }
-    }
-  }
-
-  return { from, to }
-}
+import type { DateRange } from "./range"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client metrics
@@ -502,8 +456,8 @@ export async function getMessagingMetrics(
         )
         .where(
           sql`client_msg.sender_role = 'client'
-            and client_msg.created_at >= ${range.from}
-            and client_msg.created_at <= ${range.to}
+            and client_msg.created_at >= ${range.from.toISOString()}
+            and client_msg.created_at <= ${range.to.toISOString()}
             and next_pro.created_at is not null`,
         ),
     ])

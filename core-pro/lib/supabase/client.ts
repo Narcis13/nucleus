@@ -28,7 +28,13 @@ export function useSupabaseBrowser(): SupabaseClient {
         env.NEXT_PUBLIC_SUPABASE_URL,
         env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
         {
-          accessToken: async () => (await getToken()) ?? null,
+          // Clerk's getToken is browser-only; during SSR of this client
+          // component, return null so Supabase treats the request as anon.
+          // Once hydrated, the callback re-runs with a real session token.
+          accessToken: async () => {
+            if (typeof window === "undefined") return null
+            return (await getToken()) ?? null
+          },
         },
       ),
     [getToken],

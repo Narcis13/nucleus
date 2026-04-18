@@ -121,7 +121,7 @@ export function useNotifications(
     void fetchLatest()
 
     const channel = supabase
-      .channel(`notifications:${role}`)
+      .channel(`notifications:${role}:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
@@ -207,7 +207,7 @@ export function useUnreadCount(): number {
     void refresh()
 
     const channel = supabase
-      .channel(`notifications-count:${role}`)
+      .channel(`notifications-count:${role}:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },

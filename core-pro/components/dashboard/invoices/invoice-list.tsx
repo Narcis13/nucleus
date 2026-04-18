@@ -248,7 +248,11 @@ export function InvoiceList({
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
-                            <Button variant="ghost" size="icon">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Invoice actions"
+                            >
                               <MoreHorizontal className="size-4" />
                             </Button>
                           }

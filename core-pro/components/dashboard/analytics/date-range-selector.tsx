@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 
-import { RANGE_PRESETS, type RangePreset } from "@/lib/analytics/queries"
+import { RANGE_PRESETS, type RangePreset } from "@/lib/analytics/range"
 
 // Syncs the chosen range to ?range= / ?from= / ?to= so server components can
 // read it directly. Kept out of the form-control pattern — a change to the

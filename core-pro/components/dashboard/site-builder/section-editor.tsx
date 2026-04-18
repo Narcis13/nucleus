@@ -172,6 +172,7 @@ function AboutEditor({ config, onChange }: EditorProps) {
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Remove certification"
               onClick={() => {
                 const next = certList.filter((_, i) => i !== idx)
                 patchSection(onChange, "about", { certifications: next })

@@ -87,6 +87,7 @@ export function Topbar({
           <input
             type="search"
             placeholder="Search clients, invoices, forms…"
+            aria-label="Search workspace"
             className="h-8 w-full rounded-md border border-border bg-muted/40 pr-2 pl-8 text-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:bg-background focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             disabled
           />

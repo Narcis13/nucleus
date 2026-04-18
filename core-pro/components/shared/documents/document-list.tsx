@@ -166,7 +166,11 @@ export function DocumentList({
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
-                        <Button variant="ghost" size="icon-sm">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Document actions"
+                        >
                           <MoreHorizontal className="size-3.5" />
                         </Button>
                       }

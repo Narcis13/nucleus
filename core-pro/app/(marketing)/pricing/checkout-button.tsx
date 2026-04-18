@@ -38,6 +38,7 @@ export function CheckoutButton({
     return (
       <Button
         className="w-full"
+        nativeButton={false}
         render={
           <Link
             href={{
