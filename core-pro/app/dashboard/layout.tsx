@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/dashboard/breadcrumbs"
 import { MobileNav } from "@/components/dashboard/mobile-nav"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Topbar } from "@/components/dashboard/topbar"
+import { Toaster } from "@/components/ui/sonner"
 import { getCurrentClerkUserId } from "@/lib/clerk/helpers"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { syncLocaleFromDb } from "@/lib/i18n/locale"
@@ -81,6 +82,7 @@ export default async function DashboardLayout({
       </div>
 
       <MobileNav />
+      <Toaster position="top-right" richColors closeButton />
     </div>
   )
 }

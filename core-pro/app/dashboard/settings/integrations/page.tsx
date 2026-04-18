@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic"
 export default async function IntegrationsSettingsPage() {
   const professional = await getProfessional()
   if (!professional) {
-    redirect("/sign-in?redirect_url=/dashboard/settings/integrations")
+    redirect("/onboarding")
   }
 
   const rows = await dbAdmin

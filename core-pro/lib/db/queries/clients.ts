@@ -178,16 +178,28 @@ export async function createClient(
   if (!professional) {
     throw new Error("No professional context — cannot create client")
   }
+  // Generate the id in JS so we can skip RETURNING on the clients insert.
+  // Both SELECT policies on `clients` reject the brand-new row (no
+  // professional_clients link yet, clerk_user_id is null), so RETURNING would
+  // raise 42501. Inserting the link first, then re-selecting, lets the
+  // professional's SELECT policy match.
+  const clientId = crypto.randomUUID()
   return withRLS(async (tx) => {
-    const [created] = await tx.insert(clients).values(input).returning()
-    if (!created) throw new Error("Failed to insert client")
+    await tx.insert(clients).values({ ...input, id: clientId })
     await tx.insert(professionalClients).values({
       professionalId: professional.id,
-      clientId: created.id,
+      clientId,
       status: link?.status ?? "active",
       role: link?.role ?? "client",
       source: link?.source,
     })
+    const rows = await tx
+      .select()
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .limit(1)
+    const created = rows[0]
+    if (!created) throw new Error("Failed to insert client")
     return created
   })
 }

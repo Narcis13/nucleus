@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic"
 export default async function CalendarSettingsPage() {
   const professional = await getProfessional()
   if (!professional) {
-    redirect("/sign-in?redirect_url=/dashboard/settings/calendar")
+    redirect("/onboarding")
   }
 
   const settings = await dbAdmin

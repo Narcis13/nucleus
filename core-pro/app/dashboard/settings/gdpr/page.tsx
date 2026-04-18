@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic"
 
 export default async function GdprSettingsPage() {
   const professional = await getProfessional()
-  if (!professional) redirect("/sign-in?redirect_url=/dashboard/settings/gdpr")
+  if (!professional) redirect("/onboarding")
 
   const [rows, clients] = await Promise.all([
     dbAdmin

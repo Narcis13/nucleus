@@ -32,15 +32,6 @@ import type { PlanLimits } from "@/types/domain"
 // ─────────────────────────────────────────────────────────────────────────────
 const BUCKET = "documents"
 const SIGNED_URL_TTL_SECONDS = 60 * 60 // 60 minutes — matches plan spec
-export const DOCUMENT_CATEGORIES = [
-  "General",
-  "Contract",
-  "Identity",
-  "Medical",
-  "Financial",
-  "Other",
-] as const
-export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers

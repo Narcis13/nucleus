@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/select"
 import {
   createDocumentAction,
-  DOCUMENT_CATEGORIES,
   portalCreateDocumentAction,
   portalPrepareDocumentUploadAction,
   prepareDocumentUploadAction,
 } from "@/lib/actions/documents"
+import { DOCUMENT_CATEGORIES } from "@/lib/constants/documents"
 import { useSupabaseBrowser } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import type { Client } from "@/types/domain"

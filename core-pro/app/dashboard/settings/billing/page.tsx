@@ -39,7 +39,7 @@ export default async function BillingPage({
 }) {
   const professionalId = await getCurrentProfessionalId()
   if (!professionalId) {
-    redirect("/sign-in?redirect_url=/dashboard/settings/billing")
+    redirect("/onboarding")
   }
 
   const [status, usage, params] = await Promise.all([

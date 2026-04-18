@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic"
 
 export default async function TeamSettingsPage() {
   const professional = await getProfessional()
-  if (!professional) redirect("/sign-in?redirect_url=/dashboard/settings/team")
+  if (!professional) redirect("/onboarding")
 
   const plan = getPlan(professional.plan)
   const hasProPlan = planAtLeast(plan.id, "pro")

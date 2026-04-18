@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation"
+
 import { KanbanBoard } from "@/components/dashboard/leads/kanban-board"
 import { StageManager } from "@/components/dashboard/leads/stage-manager"
 import { PageHeader } from "@/components/shared/page-header"
@@ -6,8 +8,12 @@ import {
   getActivitiesForLeads,
   getLeads,
 } from "@/lib/db/queries/leads"
+import { getProfessional } from "@/lib/db/queries/professionals"
 
 export default async function LeadsPipelinePage() {
+  const professional = await getProfessional()
+  if (!professional) redirect("/onboarding")
+
   // Seed the default New → Won pipeline on first load. Subsequent loads
   // return the existing rows without inserting.
   const stages = await ensureDefaultStages()

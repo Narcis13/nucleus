@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { DOCUMENT_CATEGORIES } from "@/lib/actions/documents"
+import { DOCUMENT_CATEGORIES } from "@/lib/constants/documents"
 import { cn } from "@/lib/utils"
 import type { Client } from "@/types/domain"
 

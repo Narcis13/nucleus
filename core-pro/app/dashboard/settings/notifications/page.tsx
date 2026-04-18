@@ -18,7 +18,7 @@ export default async function NotificationSettingsPage() {
   if (role !== "professional") redirect("/dashboard")
 
   const professional = await getProfessional()
-  if (!professional) redirect("/sign-in")
+  if (!professional) redirect("/onboarding")
 
   const stored = await getMyNotificationPreferences({
     userId: professional.id,
