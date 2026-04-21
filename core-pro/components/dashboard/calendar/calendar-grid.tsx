@@ -58,6 +58,43 @@ type View = "day" | "week" | "month"
 
 const HOUR_HEIGHT = 48 // px
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const DAY_LABELS_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+]
+const MONTH_LABELS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+]
+const MONTH_LABELS_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
 
 export function CalendarGrid({
   events: initialEvents,
@@ -75,10 +112,20 @@ export function CalendarGrid({
   const router = useRouter()
   const [view, setView] = useState<View>("week")
   const [anchor, setAnchor] = useState(() => startOfWeek(new Date()))
-  const [events, setEvents] = useState<CalendarEvent[]>(initialEvents)
+  const [events, setEvents] = useState<CalendarEvent[]>(() =>
+    initialEvents.map(normalizeEvent),
+  )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [creatingAt, setCreatingAt] = useState<Date | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  // @dnd-kit uses a module-global id counter that survives client-side
+  // navigation but resets on SSR, which produces a hydration mismatch on
+  // repeat visits. Gate DndContext on a post-mount flag so the client always
+  // renders it fresh after hydration.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Re-seed from the server prop whenever it changes (form save / cancel
   // calls revalidatePath and this prop updates). The reschedule action
@@ -86,7 +133,7 @@ export function CalendarGrid({
   // on rapid-fire drags, so in that path `initialEvents` is stable and this
   // effect is a no-op.
   useEffect(() => {
-    setEvents(initialEvents)
+    setEvents(initialEvents.map(normalizeEvent))
   }, [initialEvents])
 
   const sensors = useSensors(
@@ -96,7 +143,7 @@ export function CalendarGrid({
   const reschedule = useAction(rescheduleAppointmentAction, {
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't reschedule.")
-      setEvents(initialEvents)
+      setEvents(initialEvents.map(normalizeEvent))
     },
   })
 
@@ -105,16 +152,27 @@ export function CalendarGrid({
     if (!over) return
     const overId = String(over.id)
     if (!overId.startsWith("cell:")) return
-    const [, dateIso, hourStr] = overId.split(":")
-    if (!dateIso || hourStr === undefined) return
+    const [, dayMsStr, hourStr] = overId.split(":")
+    if (!dayMsStr || hourStr === undefined) return
+    const dayMs = Number(dayMsStr)
     const targetHour = Number(hourStr)
+    if (!Number.isFinite(dayMs) || !Number.isFinite(targetHour)) return
     const ev = events.find((e) => e.id === String(active.id))
     if (!ev) return
 
-    const duration = ev.endAt.getTime() - ev.startAt.getTime()
-    const newStart = new Date(dateIso)
+    // Defensive: RSC can hand us Dates or ISO strings depending on the
+    // revalidation path. Normalize to ms so arithmetic never yields NaN.
+    const startMs = toMs(ev.startAt)
+    const endMs = toMs(ev.endAt)
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return
+    const duration = endMs - startMs
+
+    const newStart = new Date(dayMs)
     newStart.setHours(targetHour, 0, 0, 0)
-    const newEnd = new Date(newStart.getTime() + duration)
+    const newStartMs = newStart.getTime()
+    if (!Number.isFinite(newStartMs)) return
+    const newEnd = new Date(newStartMs + duration)
+    if (!Number.isFinite(newEnd.getTime())) return
 
     setEvents((prev) =>
       prev.map((e) =>
@@ -230,7 +288,7 @@ export function CalendarGrid({
       {/* Grid */}
       {view === "month" ? (
         <MonthView days={visibleDays} events={events} onClick={onCreate} />
-      ) : (
+      ) : mounted ? (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           <TimeGrid
             days={visibleDays}
@@ -239,6 +297,13 @@ export function CalendarGrid({
             onCreateAt={onCreate}
           />
         </DndContext>
+      ) : (
+        <TimeGrid
+          days={visibleDays}
+          events={events}
+          onEditEvent={onEdit}
+          onCreateAt={onCreate}
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -373,7 +438,7 @@ function DayHourCell({
   onEditEvent: (id: string) => void
   onCreateAt: (at: Date) => void
 }) {
-  const id = `cell:${day.toISOString()}:${hour}`
+  const id = `cell:${day.getTime()}:${hour}`
   const { setNodeRef, isOver } = useDroppable({ id })
 
   // Only render events whose START hour matches this cell — avoids dupes
@@ -586,22 +651,32 @@ function isToday(d: Date): boolean {
     d.getFullYear() === t.getFullYear()
   )
 }
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0")
+}
+function toMs(d: Date | string | number): number {
+  if (d instanceof Date) return d.getTime()
+  if (typeof d === "number") return d
+  return new Date(d).getTime()
+}
+function toDate(d: Date | string | number): Date {
+  return d instanceof Date ? d : new Date(d)
+}
+function normalizeEvent(e: CalendarEvent): CalendarEvent {
+  return { ...e, startAt: toDate(e.startAt), endAt: toDate(e.endAt) }
+}
 function fmtTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 function periodLabel(d: Date, view: View): string {
-  if (view === "day")
-    return d.toLocaleDateString(undefined, {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    })
+  if (view === "day") {
+    return `${DAY_LABELS_LONG[d.getDay()]}, ${pad2(d.getDate())} ${MONTH_LABELS_LONG[d.getMonth()]} ${d.getFullYear()}`
+  }
   if (view === "week") {
     const end = addDays(d, 6)
-    return `${d.toLocaleDateString(undefined, { day: "2-digit", month: "short" })} – ${end.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}`
+    return `${pad2(d.getDate())} ${MONTH_LABELS_SHORT[d.getMonth()]} – ${pad2(end.getDate())} ${MONTH_LABELS_SHORT[end.getMonth()]} ${end.getFullYear()}`
   }
-  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+  return `${MONTH_LABELS_LONG[d.getMonth()]} ${d.getFullYear()}`
 }
 function colorFor(status: string, type: string): string {
   if (status === "cancelled")
