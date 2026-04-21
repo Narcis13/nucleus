@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { getTranslations } from "next-intl/server"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,19 +21,20 @@ import { CheckoutButton } from "./checkout-button"
 // derived from the union of every plan's feature list so new features show
 // up automatically on this table.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PricingPage() {
+export default async function PricingPage() {
+  const t = await getTranslations("marketing.pricing")
   const plans = PLAN_ORDER.map((id) => PLANS[id])
   const allFeatures = collectFeatures(plans.flatMap((p) => p.features))
+
+  const humanizeFeature = (f: PlanFeature): string => t(`features.${f}`)
 
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="mx-auto max-w-2xl text-center">
         <h1 className="font-heading text-4xl font-semibold tracking-tight">
-          Simple, transparent pricing
+          {t("title")}
         </h1>
-        <p className="mt-3 text-base text-muted-foreground">
-          Start free, scale as your practice grows. Cancel anytime.
-        </p>
+        <p className="mt-3 text-base text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -44,18 +46,20 @@ export default function PricingPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{plan.name}</CardTitle>
-                {plan.highlighted && <Badge>Most popular</Badge>}
+                {plan.highlighted && <Badge>{t("mostPopular")}</Badge>}
               </div>
               <CardDescription>{plan.description}</CardDescription>
               <div className="mt-4 flex items-baseline gap-1">
                 {plan.monthlyPriceEur === null ? (
-                  <span className="text-3xl font-semibold">Custom</span>
+                  <span className="text-3xl font-semibold">{t("custom")}</span>
                 ) : (
                   <>
                     <span className="text-4xl font-semibold">
                       €{plan.monthlyPriceEur}
                     </span>
-                    <span className="text-sm text-muted-foreground">/month</span>
+                    <span className="text-sm text-muted-foreground">
+                      {t("perMonth")}
+                    </span>
                   </>
                 )}
               </div>
@@ -63,20 +67,14 @@ export default function PricingPage() {
             <CardContent className="text-sm">
               <ul className="space-y-2">
                 <li>
-                  <strong>
-                    {plan.maxClients === Number.POSITIVE_INFINITY
-                      ? "Unlimited"
-                      : plan.maxClients}
-                  </strong>{" "}
-                  active clients
+                  {plan.maxClients === Number.POSITIVE_INFINITY
+                    ? t("activeClientsUnlimited")
+                    : t("activeClients", { count: plan.maxClients })}
                 </li>
                 <li>
-                  <strong>
-                    {plan.maxStorageMb === Number.POSITIVE_INFINITY
-                      ? "Unlimited"
-                      : `${plan.maxStorageMb} MB`}
-                  </strong>{" "}
-                  document storage
+                  {plan.maxStorageMb === Number.POSITIVE_INFINITY
+                    ? t("documentStorageUnlimited")
+                    : t("documentStorage", { mb: plan.maxStorageMb })}
                 </li>
                 {plan.features.slice(-3).map((f) => (
                   <li key={f}>{humanizeFeature(f)}</li>
@@ -90,7 +88,7 @@ export default function PricingPage() {
                   nativeButton={false}
                   render={<Link href="mailto:sales@corepro.app" />}
                 >
-                  Contact sales
+                  {t("contactSales")}
                 </Button>
               ) : (
                 <CheckoutButton planId={plan.id as Exclude<PlanId, "enterprise">} />
@@ -101,12 +99,14 @@ export default function PricingPage() {
       </div>
 
       <div className="mt-20">
-        <h2 className="font-heading text-2xl font-semibold">Compare features</h2>
+        <h2 className="font-heading text-2xl font-semibold">
+          {t("compareFeatures")}
+        </h2>
         <div className="mt-6 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>
-                <th className="px-4 py-3 font-medium">Feature</th>
+                <th className="px-4 py-3 font-medium">{t("featureColumn")}</th>
                 {plans.map((p) => (
                   <th key={p.id} className="px-4 py-3 font-medium">
                     {p.name}
@@ -135,39 +135,4 @@ export default function PricingPage() {
 
 function collectFeatures(xs: PlanFeature[]): PlanFeature[] {
   return Array.from(new Set(xs))
-}
-
-function humanizeFeature(f: PlanFeature): string {
-  switch (f) {
-    case "crm":
-      return "Client CRM"
-    case "lead_pipeline":
-      return "Lead pipeline (Kanban)"
-    case "messaging":
-      return "In-app messaging"
-    case "calendar":
-      return "Calendar & scheduling"
-    case "forms":
-      return "Form builder"
-    case "documents":
-      return "Document management"
-    case "notifications":
-      return "Notifications"
-    case "invoicing":
-      return "Invoicing"
-    case "micro_site":
-      return "Public micro-site"
-    case "marketing_kit":
-      return "Marketing kit"
-    case "automations":
-      return "Automations"
-    case "analytics":
-      return "Analytics dashboard"
-    case "custom_branding":
-      return "Custom branding"
-    case "priority_support":
-      return "Priority support"
-    case "sso":
-      return "SSO / SAML"
-  }
 }

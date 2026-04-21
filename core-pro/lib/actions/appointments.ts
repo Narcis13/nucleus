@@ -4,6 +4,21 @@ import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORTANT — why create/update/cancel return the full Appointment and do NOT
+// call `revalidatePath` for the calendar route:
+//
+// Next 16 + Turbopack racy-RSC bug. When a server action that mutates data
+// calls `revalidatePath("/dashboard/calendar")`, the resulting RSC re-stream
+// collides with the dialog-close + grid re-render and crashes with
+// `initializeDebugInfo` / `enqueueModel`. Same family of bug that forced the
+// drag-reschedule action to skip revalidation.
+//
+// Mitigation: return the full appointment from each action so the calendar
+// grid can update its local state optimistically. The AgendaSidebar stays
+// stale until the next navigation, which is acceptable for now.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import {
   ActionError,
   authedAction,
@@ -13,6 +28,7 @@ import {
   cancelAppointment as cancelAppointmentQuery,
   createAppointment as createAppointmentQuery,
   createPublicBooking,
+  getAppointment,
   getAvailableSlotsPublic,
   replaceAvailability,
   setCalendarBufferMinutes,
@@ -151,8 +167,7 @@ export const createAppointmentAction = authedAction
       type: parsedInput.type,
     })
 
-    revalidatePath("/dashboard/calendar")
-    return { id: created.id }
+    return { appointment: created }
   })
 
 export const updateAppointmentAction = authedAction
@@ -180,8 +195,7 @@ export const updateAppointmentAction = authedAction
       }).catch(() => {})
     }
 
-    revalidatePath("/dashboard/calendar")
-    return { id: updated.id }
+    return { appointment: updated }
   })
 
 // Drag-to-reschedule on the calendar. Deliberately skips `revalidatePath` —
@@ -197,6 +211,12 @@ export const rescheduleAppointmentAction = authedAction
     const endAt = new Date(parsedInput.endAt)
     if (endAt <= startAt) {
       throw new ActionError("End time must be after start time.")
+    }
+
+    const existing = await getAppointment(parsedInput.id)
+    if (!existing) throw new ActionError("Appointment not found.")
+    if (existing.appointment.status === "cancelled") {
+      throw new ActionError("Cancelled appointments can't be rescheduled.")
     }
 
     const updated = await updateAppointmentQuery(parsedInput.id, {
@@ -220,8 +240,7 @@ export const cancelAppointmentAction = authedAction
       appointmentId: parsedInput.id,
       kind: "cancellation",
     }).catch(() => {})
-    revalidatePath("/dashboard/calendar")
-    return { id: cancelled.id }
+    return { appointment: cancelled }
   })
 
 export const saveAvailabilityAction = authedAction

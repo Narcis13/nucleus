@@ -1,7 +1,9 @@
 import Link from "next/link"
 import { auth } from "@clerk/nextjs/server"
 import { UserButton } from "@clerk/nextjs"
+import { getTranslations } from "next-intl/server"
 
+import { LocaleSwitcher } from "@/components/shared/i18n/locale-switcher"
 import { Button } from "@/components/ui/button"
 
 export default async function MarketingLayout({
@@ -11,6 +13,7 @@ export default async function MarketingLayout({
 }) {
   const { userId } = await auth()
   const isSignedIn = Boolean(userId)
+  const t = await getTranslations("marketing.header")
 
   return (
     <>
@@ -22,18 +25,19 @@ export default async function MarketingLayout({
 
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <Link href="/pricing" className="transition-colors hover:text-foreground">
-              Pricing
+              {t("pricing")}
             </Link>
             <Link href="/blog" className="transition-colors hover:text-foreground">
-              Blog
+              {t("blog")}
             </Link>
           </nav>
 
           <div className="flex items-center gap-2">
+            <LocaleSwitcher variant="compact" />
             {isSignedIn ? (
               <>
                 <Link href="/dashboard">
-                  <Button size="sm">Go to dashboard</Button>
+                  <Button size="sm">{t("goToDashboard")}</Button>
                 </Link>
                 <UserButton afterSignOutUrl="/" />
               </>
@@ -41,11 +45,11 @@ export default async function MarketingLayout({
               <>
                 <Link href="/sign-in">
                   <Button variant="ghost" size="sm">
-                    Sign in
+                    {t("signIn")}
                   </Button>
                 </Link>
                 <Link href="/sign-up">
-                  <Button size="sm">Start free</Button>
+                  <Button size="sm">{t("startFree")}</Button>
                 </Link>
               </>
             )}

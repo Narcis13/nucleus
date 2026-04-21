@@ -161,6 +161,85 @@
       "empty": "Momentan nu există progres de urmărit."
     }
   },
+  "marketing": {
+    "header": {
+      "pricing": "Prețuri",
+      "blog": "Blog",
+      "goToDashboard": "Deschide panoul",
+      "signIn": "Autentificare",
+      "startFree": "Începe gratuit"
+    },
+    "home": {
+      "eyebrow": "Boilerplate-ul universal de CRM pentru profesioniști din servicii",
+      "heroTitle": "Concentrează-te pe munca ta, nu pe unelte.",
+      "heroSubtitle": "CorePro oferă antrenorilor, consultanților și agenților un portal pentru clienți, programări, mesagerie, facturare și un micro-site de marketing — într-un singur spațiu de lucru personalizat.",
+      "startFreeCta": "Începe gratuit",
+      "seePricingCta": "Vezi prețurile",
+      "featuresTitle": "Tot ce are nevoie o afacere de o singură persoană",
+      "featuresSubtitle": "Înlocuiește cinci unelte cu una singură. Păstrează-ți brandul în fiecare interacțiune.",
+      "features": {
+        "crm": {
+          "title": "CRM pentru clienți",
+          "body": "Profile, etichete, notițe, activitate — toată relația într-un singur ecran."
+        },
+        "leads": {
+          "title": "Flux de oportunități",
+          "body": "Kanban drag-and-drop care transformă oportunitățile câștigate în clienți cu un click."
+        },
+        "messaging": {
+          "title": "Mesagerie în timp real",
+          "body": "Portal pentru clienți personalizat, cu partajare de fișiere și confirmări de citire incluse."
+        },
+        "bookings": {
+          "title": "Programări și remindere",
+          "body": "Widget public de programare, export iCal, emailuri de reminder automate."
+        },
+        "forms": {
+          "title": "Formulare, facturi, documente",
+          "body": "Construiește formulare, urmărește facturi și gestionează documente dintr-un singur spațiu de lucru."
+        },
+        "automations": {
+          "title": "Automatizări și micro-site",
+          "body": "Flux-uri alimentate de Trigger.dev și un micro-site de marketing publicabil pentru fiecare profesionist."
+        }
+      },
+      "ctaTitle": "Gata să-ți consolidezi stack-ul?",
+      "ctaBody": "Începe cu planul gratuit — fă upgrade când primești primul client plătitor.",
+      "createWorkspace": "Creează-ți spațiul de lucru",
+      "signIn": "Autentifică-te"
+    },
+    "pricing": {
+      "title": "Prețuri simple și transparente",
+      "subtitle": "Începe gratuit, scalează pe măsură ce practica ta crește. Anulezi oricând.",
+      "mostPopular": "Cel mai popular",
+      "custom": "Personalizat",
+      "perMonth": "/lună",
+      "activeClients": "{count} clienți activi",
+      "activeClientsUnlimited": "Clienți activi nelimitați",
+      "documentStorage": "{mb} MB stocare documente",
+      "documentStorageUnlimited": "Stocare documente nelimitată",
+      "contactSales": "Contactează vânzările",
+      "compareFeatures": "Compară funcționalitățile",
+      "featureColumn": "Funcționalitate",
+      "features": {
+        "crm": "CRM pentru clienți",
+        "lead_pipeline": "Flux de oportunități (Kanban)",
+        "messaging": "Mesagerie în aplicație",
+        "calendar": "Calendar și programări",
+        "forms": "Constructor de formulare",
+        "documents": "Gestionare documente",
+        "notifications": "Notificări",
+        "invoicing": "Facturare",
+        "micro_site": "Micro-site public",
+        "marketing_kit": "Kit de marketing",
+        "automations": "Automatizări",
+        "analytics": "Panou de analiză",
+        "custom_branding": "Branding personalizat",
+        "priority_support": "Suport prioritar",
+        "sso": "SSO / SAML"
+      }
+    }
+  },
   "microSite": {
     "hero": {
       "bookNow": "Programează o ședință",

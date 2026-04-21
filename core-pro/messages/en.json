@@ -161,6 +161,85 @@
       "empty": "Nothing to track yet."
     }
   },
+  "marketing": {
+    "header": {
+      "pricing": "Pricing",
+      "blog": "Blog",
+      "goToDashboard": "Go to dashboard",
+      "signIn": "Sign in",
+      "startFree": "Start free"
+    },
+    "home": {
+      "eyebrow": "The universal CRM boilerplate for service professionals",
+      "heroTitle": "Run your practice, not your tooling.",
+      "heroSubtitle": "CorePro gives coaches, consultants, and agents a client portal, scheduling, messaging, invoicing, and a marketing micro-site — in one branded workspace.",
+      "startFreeCta": "Start free",
+      "seePricingCta": "See pricing",
+      "featuresTitle": "Everything a one-person business needs",
+      "featuresSubtitle": "Replace five tools with one. Keep your brand on every touchpoint.",
+      "features": {
+        "crm": {
+          "title": "Client CRM",
+          "body": "Profiles, tags, notes, activity — the full relationship on one screen."
+        },
+        "leads": {
+          "title": "Lead pipeline",
+          "body": "Drag-and-drop Kanban that converts won leads into clients in a click."
+        },
+        "messaging": {
+          "title": "Real-time messaging",
+          "body": "Branded client portal with file-sharing and read receipts baked in."
+        },
+        "bookings": {
+          "title": "Bookings & reminders",
+          "body": "Public booking widget, iCal export, automated reminder emails."
+        },
+        "forms": {
+          "title": "Forms, invoices, docs",
+          "body": "Build forms, track invoices, manage documents from a single workspace."
+        },
+        "automations": {
+          "title": "Automations & micro-site",
+          "body": "Trigger.dev-powered flows and a publishable marketing micro-site per pro."
+        }
+      },
+      "ctaTitle": "Ready to consolidate your stack?",
+      "ctaBody": "Start on the free tier — upgrade when your first paying client signs up.",
+      "createWorkspace": "Create your workspace",
+      "signIn": "Sign in"
+    },
+    "pricing": {
+      "title": "Simple, transparent pricing",
+      "subtitle": "Start free, scale as your practice grows. Cancel anytime.",
+      "mostPopular": "Most popular",
+      "custom": "Custom",
+      "perMonth": "/month",
+      "activeClients": "{count} active clients",
+      "activeClientsUnlimited": "Unlimited active clients",
+      "documentStorage": "{mb} MB document storage",
+      "documentStorageUnlimited": "Unlimited document storage",
+      "contactSales": "Contact sales",
+      "compareFeatures": "Compare features",
+      "featureColumn": "Feature",
+      "features": {
+        "crm": "Client CRM",
+        "lead_pipeline": "Lead pipeline (Kanban)",
+        "messaging": "In-app messaging",
+        "calendar": "Calendar & scheduling",
+        "forms": "Form builder",
+        "documents": "Document management",
+        "notifications": "Notifications",
+        "invoicing": "Invoicing",
+        "micro_site": "Public micro-site",
+        "marketing_kit": "Marketing kit",
+        "automations": "Automations",
+        "analytics": "Analytics dashboard",
+        "custom_branding": "Custom branding",
+        "priority_support": "Priority support",
+        "sso": "SSO / SAML"
+      }
+    }
+  },
   "microSite": {
     "hero": {
       "bookNow": "Book a session",

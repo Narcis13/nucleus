@@ -1,7 +1,7 @@
 "use client"
 
 import { useAction } from "next-safe-action/hooks"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -28,12 +28,18 @@ import type { Appointment } from "@/types/domain"
 export type ClientChoice = { id: string; fullName: string }
 export type ServiceChoice = { id: string; name: string; durationMinutes: number | null }
 
+export type AppointmentFormResult =
+  | { kind: "created"; appointment: Appointment }
+  | { kind: "updated"; appointment: Appointment }
+  | { kind: "cancelled"; appointment: Appointment }
+  | { kind: "closed" }
+
 export type AppointmentFormProps = {
   initial?: Appointment | null
   defaultStart?: Date | null
   clients: ClientChoice[]
   services: ServiceChoice[]
-  onDone: () => void
+  onDone: (result: AppointmentFormResult) => void
 }
 
 const STATUSES = [
@@ -60,15 +66,32 @@ export function AppointmentForm({
   const isEdit = Boolean(initial)
   const [form, setForm] = useState(() => initialState(initial, defaultStart))
 
+  // Base UI `<Select.Value>` renders the label of the selected item when the
+  // root Select is given an `items` prop — otherwise it falls back to the raw
+  // value, which looks ugly ("in_person", a UUID, …). Build the `{value,label}`
+  // arrays once per clients/services change.
+  const clientItems = useMemo(
+    () => clients.map((c) => ({ value: c.id, label: c.fullName })),
+    [clients],
+  )
+  const serviceItems = useMemo(
+    () => services.map((s) => ({ value: s.id, label: s.name })),
+    [services],
+  )
+
   // Reset when the parent swaps the editing target without unmounting us.
   useEffect(() => {
     setForm(initialState(initial, defaultStart))
   }, [initial, defaultStart])
 
   const create = useAction(createAppointmentAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Appointment created.")
-      onDone()
+      if (data?.appointment) {
+        onDone({ kind: "created", appointment: data.appointment })
+      } else {
+        onDone({ kind: "closed" })
+      }
     },
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't create appointment.")
@@ -76,9 +99,13 @@ export function AppointmentForm({
   })
 
   const update = useAction(updateAppointmentAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Appointment updated.")
-      onDone()
+      if (data?.appointment) {
+        onDone({ kind: "updated", appointment: data.appointment })
+      } else {
+        onDone({ kind: "closed" })
+      }
     },
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't update appointment.")
@@ -86,9 +113,13 @@ export function AppointmentForm({
   })
 
   const cancel = useAction(cancelAppointmentAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Appointment cancelled.")
-      onDone()
+      if (data?.appointment) {
+        onDone({ kind: "cancelled", appointment: data.appointment })
+      } else {
+        onDone({ kind: "closed" })
+      }
     },
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't cancel appointment.")
@@ -153,6 +184,7 @@ export function AppointmentForm({
             onValueChange={(v) =>
               setForm((f) => ({ ...f, clientId: v ?? "" }))
             }
+            items={clientItems}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="No client" />
@@ -187,6 +219,7 @@ export function AppointmentForm({
                 return { ...f, serviceId: next }
               })
             }}
+            items={serviceItems}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="No service" />
@@ -255,6 +288,7 @@ export function AppointmentForm({
                 type: (v ?? f.type) as typeof f.type,
               }))
             }
+            items={TYPES}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -280,6 +314,7 @@ export function AppointmentForm({
                 status: (v ?? f.status) as typeof f.status,
               }))
             }
+            items={STATUSES}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -339,7 +374,7 @@ export function AppointmentForm({
           <Button
             type="button"
             variant="outline"
-            onClick={onDone}
+            onClick={() => onDone({ kind: "closed" })}
             disabled={isPending}
           >
             Close

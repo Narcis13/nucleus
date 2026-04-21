@@ -10,7 +10,6 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { useAction } from "next-safe-action/hooks"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -24,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button"
 import {
   AppointmentForm,
+  type AppointmentFormResult,
   type ClientChoice,
   type ServiceChoice,
 } from "@/components/dashboard/calendar/appointment-form"
@@ -109,7 +109,6 @@ export function CalendarGrid({
   clients: ClientChoice[]
   services: ServiceChoice[]
 }) {
-  const router = useRouter()
   const [view, setView] = useState<View>("week")
   const [anchor, setAnchor] = useState(() => startOfWeek(new Date()))
   const [events, setEvents] = useState<CalendarEvent[]>(() =>
@@ -176,7 +175,21 @@ export function CalendarGrid({
 
     setEvents((prev) =>
       prev.map((e) =>
-        e.id === ev.id ? { ...e, startAt: newStart, endAt: newEnd } : e,
+        e.id === ev.id
+          ? {
+              ...e,
+              startAt: newStart,
+              endAt: newEnd,
+              // Keep the nested appointment snapshot in sync so that opening
+              // the edit dialog immediately after a drag shows the new time,
+              // not the stale pre-drag value.
+              appointment: {
+                ...e.appointment,
+                startAt: newStart,
+                endAt: newEnd,
+              },
+            }
+          : e,
       ),
     )
     reschedule.execute({
@@ -208,6 +221,32 @@ export function CalendarGrid({
     setEditingId(id)
     setCreatingAt(null)
     setDialogOpen(true)
+  }
+
+  const applyResult = (result: AppointmentFormResult) => {
+    if (result.kind === "closed") return
+    const appt = result.appointment
+    const clientName =
+      (appt.clientId &&
+        clients.find((c) => c.id === appt.clientId)?.fullName) ||
+      null
+    const next: CalendarEvent = {
+      id: appt.id,
+      title: appt.title,
+      startAt: new Date(appt.startAt),
+      endAt: new Date(appt.endAt),
+      status: appt.status,
+      type: appt.type,
+      clientName,
+      appointment: appt,
+    }
+    setEvents((prev) => {
+      const idx = prev.findIndex((e) => e.id === appt.id)
+      if (idx === -1) return [...prev, next]
+      const copy = prev.slice()
+      copy[idx] = next
+      return copy
+    })
   }
 
   return (
@@ -263,8 +302,14 @@ export function CalendarGrid({
               size="sm"
               onClick={() => {
                 setView(v)
+                // Snap the anchor to something sensible for the new view. For
+                // Day view we jump to today if the current anchor is outside
+                // the visible window — e.g. coming from Month view (anchored
+                // to the 1st) would otherwise leave the user on an empty day.
                 if (v === "month") setAnchor(startOfMonth(anchor))
                 if (v === "week") setAnchor(startOfWeek(anchor))
+                if (v === "day" && !isInCurrentWeek(anchor))
+                  setAnchor(startOfDay(new Date()))
               }}
             >
               {v[0]!.toUpperCase() + v.slice(1)}
@@ -318,9 +363,13 @@ export function CalendarGrid({
             defaultStart={creatingAt}
             clients={clients}
             services={services}
-            onDone={() => {
+            onDone={(result) => {
               setDialogOpen(false)
-              router.refresh()
+              // Create/update/cancel actions deliberately do NOT call
+              // `revalidatePath` to avoid a Next 16 RSC chunk-map race that
+              // crashes the page (initializeDebugInfo / enqueueModel). They
+              // return the full appointment instead — we merge it locally.
+              applyResult(result)
             }}
           />
         </DialogContent>
@@ -479,8 +528,11 @@ function EventBlock({
   event: CalendarEvent
   onClick: () => void
 }) {
+  // Cancelled appointments are frozen — no drag-to-reschedule. Clicking still
+  // opens the edit dialog so the user can un-cancel from there.
+  const isCancelled = event.status === "cancelled"
   const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({ id: event.id })
+    useDraggable({ id: event.id, disabled: isCancelled })
 
   const startMinutes =
     event.startAt.getHours() * 60 + event.startAt.getMinutes()
@@ -495,10 +547,18 @@ function EventBlock({
   const palette = colorFor(event.status, event.type)
 
   return (
+    // @dnd-kit's useDraggable injects attrs derived from a module-global
+    // counter + DndContext presence (role, tabIndex, aria-describedby)
+    // that aren't stable across SSR and the post-mount client commit.
+    // The `mounted` gate on DndContext upstream and every other approach
+    // still leaves React 19 + Turbopack flagging the post-effect state as
+    // a hydration diff. Suppress the warning on this one button — it's a
+    // dev-only cosmetic; runtime behavior is correct.
     <button
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      suppressHydrationWarning
       type="button"
       onClick={(e) => {
         e.stopPropagation()
@@ -650,6 +710,12 @@ function isToday(d: Date): boolean {
     d.getMonth() === t.getMonth() &&
     d.getFullYear() === t.getFullYear()
   )
+}
+function isInCurrentWeek(d: Date): boolean {
+  const weekStart = startOfWeek(new Date()).getTime()
+  const weekEnd = weekStart + 7 * 24 * 60 * 60 * 1000
+  const t = d.getTime()
+  return t >= weekStart && t < weekEnd
 }
 function pad2(n: number): string {
   return n.toString().padStart(2, "0")
