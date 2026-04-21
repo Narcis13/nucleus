@@ -12,7 +12,6 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
-import { useRouter } from "next/navigation"
 import { useAction } from "next-safe-action/hooks"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -42,12 +41,15 @@ export function KanbanBoard({
   leads: Lead[]
   activities: LeadActivity[]
 }) {
-  const router = useRouter()
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
 
-  // Sync with server-provided list whenever the page revalidates.
+  // Re-seed from the server prop whenever it changes (another action on the
+  // page — adding a lead, converting one — calls revalidatePath and this prop
+  // updates). The move action deliberately skips `revalidatePath` to avoid a
+  // Next 16 RSC chunk-map race on rapid-fire drags, so in that path
+  // `initialLeads` is stable and this effect is a no-op.
   useEffect(() => {
     setLeads(initialLeads)
   }, [initialLeads])
@@ -60,14 +62,10 @@ export function KanbanBoard({
   )
 
   const moveAction = useAction(moveLeadToStageAction, {
-    onSuccess: () => {
-      router.refresh()
-    },
-    onError: ({ error, input }) => {
+    onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't move lead.")
-      // Rollback by re-syncing from the server.
+      // Rollback by re-syncing from the server-provided list.
       setLeads(initialLeads)
-      void input
     },
   })
 
@@ -110,7 +108,6 @@ export function KanbanBoard({
     }
     if (!targetStageId || targetStageId === lead.stageId) return
 
-    // Optimistic update.
     setLeads((prev) =>
       prev.map((l) =>
         l.id === activeLeadId ? { ...l, stageId: targetStageId! } : l,

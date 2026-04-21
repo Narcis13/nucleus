@@ -58,6 +58,12 @@ const updateSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 })
 
+const rescheduleSchema = z.object({
+  id: z.string().uuid(),
+  startAt: z.string().datetime(),
+  endAt: z.string().datetime(),
+})
+
 const cancelSchema = z.object({
   id: z.string().uuid(),
   reason: z.string().max(500).optional(),
@@ -175,6 +181,32 @@ export const updateAppointmentAction = authedAction
     }
 
     revalidatePath("/dashboard/calendar")
+    return { id: updated.id }
+  })
+
+// Drag-to-reschedule on the calendar. Deliberately skips `revalidatePath` —
+// rapid successive drags otherwise race two RSC payloads in Next 16 and
+// crash the page (initializeDebugInfo / enqueueModel). The grid keeps an
+// optimistic local copy and re-seeds from the server prop on the next
+// non-drag action.
+export const rescheduleAppointmentAction = authedAction
+  .metadata({ actionName: "appointments.reschedule" })
+  .inputSchema(rescheduleSchema)
+  .action(async ({ parsedInput }) => {
+    const startAt = new Date(parsedInput.startAt)
+    const endAt = new Date(parsedInput.endAt)
+    if (endAt <= startAt) {
+      throw new ActionError("End time must be after start time.")
+    }
+
+    const updated = await updateAppointmentQuery(parsedInput.id, {
+      startAt,
+      endAt,
+    } as never)
+    if (!updated) throw new ActionError("Appointment not found.")
+
+    void scheduleAppointmentReminders(parsedInput.id).catch(() => {})
+
     return { id: updated.id }
   })
 

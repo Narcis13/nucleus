@@ -28,7 +28,7 @@ import {
   type ServiceChoice,
 } from "@/components/dashboard/calendar/appointment-form"
 import { AvailabilityEditor } from "@/components/dashboard/calendar/availability-editor"
-import { updateAppointmentAction } from "@/lib/actions/appointments"
+import { rescheduleAppointmentAction } from "@/lib/actions/appointments"
 import { cn } from "@/lib/utils"
 import type { Appointment, AvailabilitySlot } from "@/types/domain"
 
@@ -80,7 +80,11 @@ export function CalendarGrid({
   const [creatingAt, setCreatingAt] = useState<Date | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  // Sync when the parent re-renders with fresh server data.
+  // Re-seed from the server prop whenever it changes (form save / cancel
+  // calls revalidatePath and this prop updates). The reschedule action
+  // deliberately skips `revalidatePath` to avoid a Next 16 RSC chunk-map race
+  // on rapid-fire drags, so in that path `initialEvents` is stable and this
+  // effect is a no-op.
   useEffect(() => {
     setEvents(initialEvents)
   }, [initialEvents])
@@ -89,8 +93,7 @@ export function CalendarGrid({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   )
 
-  const update = useAction(updateAppointmentAction, {
-    onSuccess: () => router.refresh(),
+  const reschedule = useAction(rescheduleAppointmentAction, {
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't reschedule.")
       setEvents(initialEvents)
@@ -118,7 +121,7 @@ export function CalendarGrid({
         e.id === ev.id ? { ...e, startAt: newStart, endAt: newEnd } : e,
       ),
     )
-    update.execute({
+    reschedule.execute({
       id: ev.id,
       startAt: newStart.toISOString(),
       endAt: newEnd.toISOString(),

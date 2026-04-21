@@ -174,7 +174,12 @@ export const moveLeadToStageAction = authedAction
       parsedInput.stageId,
     )
     if (!updated) throw new ActionError("Lead not found.")
-    revalidatePath("/dashboard/leads")
+    // NOTE: deliberately no `revalidatePath` here. The kanban UI is updated
+    // optimistically on the client; a rapid move → move-back would otherwise
+    // stream two RSC payloads back-to-back and trip a Next 16 chunk-map race
+    // (`initializeDebugInfo` / `enqueueModel` crashes). Other lead actions
+    // still revalidate — on the next navigation the timeline picks up the
+    // new `stage_changed` activity row this move wrote.
     return { id: updated.id, stageId: updated.stageId }
   })
 

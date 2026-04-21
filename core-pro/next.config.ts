@@ -26,24 +26,23 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withSentryConfig(withNextIntl(nextConfig), {
-  // Sentry source map upload + tunnel route config.
-  // Auth token, org, and project are read from env vars:
-  //   SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT
+// `withSentryConfig` turns on the `clientTraceMetadata` Next experiment, which
+// has RSC debug-stack bugs in Next 16.2.x + Turbopack (buildFakeCallStack /
+// initializeDebugInfo crashes on `router.refresh()` after a server action).
+// Keep Sentry out of the `next dev` path and apply it only for production
+// builds, where we want source maps + tunneling anyway.
+const withIntl = withNextIntl(nextConfig)
 
-  // Tunnel route bypasses ad blockers by proxying Sentry ingest
-  // through the app's own domain.
-  tunnelRoute: "/monitoring",
-
-  // Source maps are uploaded then deleted from the build output
-  // so they're never served to clients.
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-
-  // Suppress Sentry build logs in CI unless debugging.
-  silent: !process.env.CI,
-
-  // Disable telemetry to Sentry about the plugin itself.
-  telemetry: false,
-})
+export default process.env.NODE_ENV === "production"
+  ? withSentryConfig(withIntl, {
+      // Tunnel route bypasses ad blockers by proxying Sentry ingest
+      // through the app's own domain. Auth token, org, and project come
+      // from SENTRY_AUTH_TOKEN / SENTRY_ORG / SENTRY_PROJECT.
+      tunnelRoute: "/monitoring",
+      sourcemaps: {
+        deleteSourcemapsAfterUpload: true,
+      },
+      silent: !process.env.CI,
+      telemetry: false,
+    })
+  : withIntl
