@@ -255,19 +255,24 @@ export async function convertLeadToClient(leadId: string): Promise<{
       throw new Error("Lead is missing an email — required to create a client.")
     }
 
-    const [createdClient] = await tx
-      .insert(clients)
-      .values({
-        email: lead.email,
-        fullName: lead.fullName,
-        phone: lead.phone ?? null,
-      })
-      .returning()
-    if (!createdClient) throw new Error("Failed to insert client")
+    // Pre-generate the id and skip RETURNING. INSERT ... RETURNING re-applies
+    // the clients SELECT policy to the new row, which requires a matching
+    // professional_clients link — but that link is inserted below, after the
+    // client row. RETURNING would therefore trip "new row violates row-level
+    // security policy" (42501). Without RETURNING the insert is only gated by
+    // WITH CHECK (permissive true), and downstream reads succeed because the
+    // junction row exists by then.
+    const clientId = crypto.randomUUID()
+    await tx.insert(clients).values({
+      id: clientId,
+      email: lead.email,
+      fullName: lead.fullName,
+      phone: lead.phone ?? null,
+    })
 
     await tx.insert(professionalClients).values({
       professionalId: professional.id,
-      clientId: createdClient.id,
+      clientId,
       status: "active",
       role: "client",
       source: lead.source ?? "lead",
@@ -288,7 +293,7 @@ export async function convertLeadToClient(leadId: string): Promise<{
     await tx
       .update(leads)
       .set({
-        convertedClientId: createdClient.id,
+        convertedClientId: clientId,
         stageId: wonStage?.id ?? lead.stageId,
       })
       .where(eq(leads.id, leadId))
@@ -297,10 +302,10 @@ export async function convertLeadToClient(leadId: string): Promise<{
       leadId,
       type: "converted",
       description: "Converted to client",
-      metadata: { clientId: createdClient.id },
+      metadata: { clientId },
     })
 
-    return { clientId: createdClient.id, leadId }
+    return { clientId, leadId }
   })
 }
 

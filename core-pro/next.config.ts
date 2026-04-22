@@ -24,6 +24,16 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.clerk.dev" },
     ],
   },
+  // Next 16.2.x defaults `experimental.reactDebugChannel` to true, which routes
+  // RSC owner-stack debug info through a side channel the client never
+  // receives. The flight stream still emits `D"$refId"` pointers into that
+  // channel, so soft-navigating into the dashboard crashes during RSC decode
+  // with `frame.join is not a function` / `Cannot read properties of undefined
+  // (reading 'stack')`. Turning it off keeps debug info inlined in the main
+  // stream.
+  experimental: {
+    reactDebugChannel: false,
+  },
 }
 
 // `withSentryConfig` turns on the `clientTraceMetadata` Next experiment, which

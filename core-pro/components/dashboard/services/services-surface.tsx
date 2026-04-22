@@ -208,6 +208,7 @@ export function ServicesSurface({
       )}
 
       <ServiceDialog
+        key={editing?.id ?? "new"}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         service={editing}
@@ -262,7 +263,7 @@ function ServiceDialog({
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceSchema),
-    defaultValues: {
+    values: {
       name: service?.name ?? "",
       description: service?.description ?? "",
       price: service?.price ?? "",

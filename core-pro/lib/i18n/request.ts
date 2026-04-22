@@ -20,8 +20,8 @@ import {
 //
 // We intentionally do NOT query the database here: getRequestConfig runs on
 // every navigation, so a DB round-trip would regress TTFB. DB-persisted
-// locale is synced into the cookie from the sign-in / portal-bootstrap flow
-// instead (see lib/i18n/locale.ts#syncLocaleFromDb).
+// locale is synced into the cookie by the locale-switcher Server Action
+// (see lib/actions/locale.ts).
 async function resolveLocale(): Promise<Locale> {
   const cookieStore = await cookies()
   const cookieValue = cookieStore.get(LOCALE_COOKIE)?.value

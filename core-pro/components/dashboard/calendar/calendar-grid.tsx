@@ -424,12 +424,31 @@ function TimeGrid({
           </div>
         ))}
 
-        {hours.map((h) => (
-          <HourRow
-            key={h}
-            hour={h}
-            days={days}
-            events={events}
+        {/* Time axis — a single column that stacks 24 hour labels. Sits in the
+            same grid row as every day column below, so the row height is
+            governed by HOUR_HEIGHT * 24 and labels stay aligned with cells. */}
+        <div className="flex flex-col">
+          {hours.map((h) => (
+            <div
+              key={h}
+              className="border-t border-border pr-1 text-right text-[10px] text-muted-foreground"
+              style={{ height: HOUR_HEIGHT }}
+            >
+              {pad2(h)}:00
+            </div>
+          ))}
+        </div>
+        {days.map((d) => (
+          <DayColumn
+            key={d.toDateString()}
+            day={d}
+            hours={hours}
+            events={events.filter(
+              (e) =>
+                e.startAt.getDate() === d.getDate() &&
+                e.startAt.getMonth() === d.getMonth() &&
+                e.startAt.getFullYear() === d.getFullYear(),
+            )}
             onEditEvent={onEditEvent}
             onCreateAt={onCreateAt}
           />
@@ -439,72 +458,52 @@ function TimeGrid({
   )
 }
 
-function HourRow({
-  hour,
-  days,
+// One column per day: a relatively-positioned stack of 24 droppable hour
+// cells with events layered on top. Positioning events at the column level
+// (not per cell) lets a multi-hour event span the right number of cells
+// naturally, and a 1-hour event fill exactly one — no accidental overflow.
+function DayColumn({
+  day,
+  hours,
   events,
   onEditEvent,
   onCreateAt,
 }: {
-  hour: number
-  days: Date[]
+  day: Date
+  hours: number[]
   events: CalendarEvent[]
   onEditEvent: (id: string) => void
   onCreateAt: (at: Date) => void
 }) {
   return (
-    <>
-      <div
-        className="border-t border-border pr-1 text-right text-[10px] text-muted-foreground"
-        style={{ height: HOUR_HEIGHT }}
-      >
-        {hour.toString().padStart(2, "0")}:00
-      </div>
-      {days.map((day) => (
-        <DayHourCell
-          key={`${day.toDateString()}-${hour}`}
-          day={day}
-          hour={hour}
-          events={events}
-          onEditEvent={onEditEvent}
-          onCreateAt={onCreateAt}
-        />
+    <div className="relative">
+      {hours.map((h) => (
+        <DayHourCell key={h} day={day} hour={h} onCreateAt={onCreateAt} />
       ))}
-    </>
+      {events.map((e) => (
+        <EventBlock key={e.id} event={e} onClick={() => onEditEvent(e.id)} />
+      ))}
+    </div>
   )
 }
 
 function DayHourCell({
   day,
   hour,
-  events,
-  onEditEvent,
   onCreateAt,
 }: {
   day: Date
   hour: number
-  events: CalendarEvent[]
-  onEditEvent: (id: string) => void
   onCreateAt: (at: Date) => void
 }) {
   const id = `cell:${day.getTime()}:${hour}`
   const { setNodeRef, isOver } = useDroppable({ id })
 
-  // Only render events whose START hour matches this cell — avoids dupes
-  // across rows. The block's height covers its true duration.
-  const eventsHere = events.filter((e) => {
-    const sameDay =
-      e.startAt.getDate() === day.getDate() &&
-      e.startAt.getMonth() === day.getMonth() &&
-      e.startAt.getFullYear() === day.getFullYear()
-    return sameDay && e.startAt.getHours() === hour
-  })
-
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "relative border-t border-l border-border",
+        "border-t border-l border-border",
         isOver && "bg-muted/40",
       )}
       style={{ height: HOUR_HEIGHT }}
@@ -513,11 +512,7 @@ function DayHourCell({
         at.setHours(hour, 0, 0, 0)
         onCreateAt(at)
       }}
-    >
-      {eventsHere.map((e) => (
-        <EventBlock key={e.id} event={e} onClick={() => onEditEvent(e.id)} />
-      ))}
-    </div>
+    />
   )
 }
 
@@ -534,15 +529,18 @@ function EventBlock({
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: event.id, disabled: isCancelled })
 
+  // `top` is offset from midnight of the day column (not from the starting
+  // hour's cell), and `height` is capped at one cell so the card always fits
+  // inside the slot it starts in — even when the booking runs longer than an
+  // hour. The full range is surfaced in the label instead of by the card size.
   const startMinutes =
     event.startAt.getHours() * 60 + event.startAt.getMinutes()
   const endMinutes = event.endAt.getHours() * 60 + event.endAt.getMinutes()
-  const cellTopMinutes = event.startAt.getHours() * 60
-  const top = ((startMinutes - cellTopMinutes) / 60) * HOUR_HEIGHT
-  const height = Math.max(
-    16,
-    ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT - 2,
-  )
+  const durationMinutes = Math.max(0, endMinutes - startMinutes)
+  const top = (startMinutes / 60) * HOUR_HEIGHT
+  const naturalHeight = (durationMinutes / 60) * HOUR_HEIGHT - 2
+  const height = Math.max(16, Math.min(naturalHeight, HOUR_HEIGHT - 2))
+  const overflowsCell = durationMinutes > 60
 
   const palette = colorFor(event.status, event.type)
 
@@ -579,7 +577,11 @@ function EventBlock({
     >
       <p className="truncate font-medium">{event.title}</p>
       <p className="truncate opacity-80">
-        {fmtTime(event.startAt)} · {event.clientName ?? "—"}
+        {overflowsCell
+          ? `${fmtTime(event.startAt)}–${fmtTime(event.endAt)}`
+          : fmtTime(event.startAt)}
+        {" · "}
+        {event.clientName ?? "—"}
       </p>
     </button>
   )

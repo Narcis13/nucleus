@@ -9,7 +9,6 @@ import { Topbar } from "@/components/dashboard/topbar"
 import { Toaster } from "@/components/ui/sonner"
 import { getCurrentClerkUserId } from "@/lib/clerk/helpers"
 import { getProfessional } from "@/lib/db/queries/professionals"
-import { syncLocaleFromDb } from "@/lib/i18n/locale"
 import type { Branding } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,10 +42,6 @@ export default async function DashboardLayout({
     getProfessional(),
     cookies(),
   ])
-
-  // First-login locale bootstrap — on subsequent visits the cookie is already
-  // set so this is a no-op. The switcher in Settings overwrites either way.
-  await syncLocaleFromDb(professional?.locale ?? null)
 
   const collapsed =
     cookieStore.get("dashboard:sidebar-collapsed")?.value === "1"
