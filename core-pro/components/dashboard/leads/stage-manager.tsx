@@ -1,7 +1,6 @@
 "use client"
 
 import { Plus, Settings2, Trash2 } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { useAction } from "next-safe-action/hooks"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -30,9 +29,19 @@ import type { LeadStage } from "@/types/domain"
 //
 // Inline stage CRUD shown in a dialog from the leads page header. Lets the
 // professional add new stages, rename / recolor existing ones, toggle the
-// won/lost flags, and delete empty stages.
+// won/lost flags, and delete empty stages. Mutations bubble up via the
+// onStageUpserted / onStageRemoved callbacks so the parent pipeline keeps
+// a single source of truth for stage state.
 // ─────────────────────────────────────────────────────────────────────────────
-export function StageManager({ stages }: { stages: LeadStage[] }) {
+export function StageManager({
+  stages,
+  onStageUpserted,
+  onStageRemoved,
+}: {
+  stages: LeadStage[]
+  onStageUpserted: (stage: LeadStage) => void
+  onStageRemoved: (id: string) => void
+}) {
   const [open, setOpen] = useState(false)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -55,34 +64,46 @@ export function StageManager({ stages }: { stages: LeadStage[] }) {
         </DialogHeader>
         <div className="flex flex-col gap-3">
           {stages.map((stage) => (
-            <StageRow key={stage.id} stage={stage} />
+            <StageRow
+              key={stage.id}
+              stage={stage}
+              onStageUpserted={onStageUpserted}
+              onStageRemoved={onStageRemoved}
+            />
           ))}
-          <CreateStageRow />
+          <CreateStageRow onStageUpserted={onStageUpserted} />
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-function StageRow({ stage }: { stage: LeadStage }) {
-  const router = useRouter()
+function StageRow({
+  stage,
+  onStageUpserted,
+  onStageRemoved,
+}: {
+  stage: LeadStage
+  onStageUpserted: (stage: LeadStage) => void
+  onStageRemoved: (id: string) => void
+}) {
   const [name, setName] = useState(stage.name)
   const [color, setColor] = useState(stage.color ?? "#6366f1")
   const [isWon, setIsWon] = useState(stage.isWon)
   const [isLost, setIsLost] = useState(stage.isLost)
 
   const updateAction = useAction(updateStageAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Stage updated.")
-      router.refresh()
+      if (data?.stage) onStageUpserted(data.stage)
     },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't update stage."),
   })
   const deleteAction = useAction(deleteStageAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Stage deleted.")
-      router.refresh()
+      if (data?.id) onStageRemoved(data.id)
     },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't delete stage."),
@@ -167,21 +188,24 @@ function StageRow({ stage }: { stage: LeadStage }) {
   )
 }
 
-function CreateStageRow() {
-  const router = useRouter()
+function CreateStageRow({
+  onStageUpserted,
+}: {
+  onStageUpserted: (stage: LeadStage) => void
+}) {
   const [name, setName] = useState("")
   const [color, setColor] = useState("#6366f1")
   const [isWon, setIsWon] = useState(false)
   const [isLost, setIsLost] = useState(false)
 
   const action = useAction(createStageAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Stage added.")
       setName("")
       setColor("#6366f1")
       setIsWon(false)
       setIsLost(false)
-      router.refresh()
+      if (data?.stage) onStageUpserted(data.stage)
     },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't add stage."),

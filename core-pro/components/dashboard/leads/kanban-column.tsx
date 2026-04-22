@@ -7,7 +7,6 @@ import {
 } from "@dnd-kit/sortable"
 import { Plus } from "lucide-react"
 import { useAction } from "next-safe-action/hooks"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -30,10 +29,12 @@ export function KanbanColumn({
   stage,
   leads,
   onLeadClick,
+  onLeadCreated,
 }: {
   stage: LeadStage
   leads: Lead[]
   onLeadClick: (id: string) => void
+  onLeadCreated: (lead: Lead) => void
 }) {
   const droppableId = `stage:${stage.id}`
   const { setNodeRef, isOver } = useDroppable({ id: droppableId })
@@ -59,7 +60,7 @@ export function KanbanColumn({
           </p>
           <span className="text-xs text-muted-foreground">{leads.length}</span>
         </div>
-        <QuickAddPopover stageId={stage.id} />
+        <QuickAddPopover stageId={stage.id} onLeadCreated={onLeadCreated} />
       </header>
 
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 min-h-32">
@@ -87,8 +88,13 @@ export function KanbanColumn({
   )
 }
 
-function QuickAddPopover({ stageId }: { stageId: string }) {
-  const router = useRouter()
+function QuickAddPopover({
+  stageId,
+  onLeadCreated,
+}: {
+  stageId: string
+  onLeadCreated: (lead: Lead) => void
+}) {
   const [open, setOpen] = useState(false)
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -96,14 +102,14 @@ function QuickAddPopover({ stageId }: { stageId: string }) {
   const [source, setSource] = useState("")
 
   const action = useAction(createLeadAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Lead added.")
       setFullName("")
       setEmail("")
       setPhone("")
       setSource("")
       setOpen(false)
-      router.refresh()
+      if (data?.lead) onLeadCreated(data.lead)
     },
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't add lead.")

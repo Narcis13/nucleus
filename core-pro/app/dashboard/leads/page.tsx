@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation"
 
-import { KanbanBoard } from "@/components/dashboard/leads/kanban-board"
-import { StageManager } from "@/components/dashboard/leads/stage-manager"
-import { PageHeader } from "@/components/shared/page-header"
+import { LeadsPipeline } from "@/components/dashboard/leads/leads-pipeline"
 import {
   ensureDefaultStages,
   getActivitiesForLeads,
@@ -21,13 +19,6 @@ export default async function LeadsPipelinePage() {
   const activities = await getActivitiesForLeads(leads.map((l) => l.id))
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Leads"
-        description={`${leads.length} ${leads.length === 1 ? "lead" : "leads"} across ${stages.length} ${stages.length === 1 ? "stage" : "stages"}.`}
-        actions={<StageManager stages={stages} />}
-      />
-      <KanbanBoard stages={stages} leads={leads} activities={activities} />
-    </div>
+    <LeadsPipeline stages={stages} leads={leads} activities={activities} />
   )
 }

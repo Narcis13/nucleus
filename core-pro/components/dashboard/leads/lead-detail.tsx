@@ -49,8 +49,8 @@ import type { Lead, LeadActivity, LeadStage } from "@/types/domain"
 //
 // Slide-over panel for a single lead. Shows contact + score + stage selector,
 // the activity timeline, and quick actions (add note/log call, convert,
-// mark lost). Activities are passed in pre-fetched from the page; mutations
-// trigger router.refresh() so the timeline + board both update.
+// mark lost). Mutations flow through callbacks the parent <LeadsPipeline>
+// passes in, so local state stays the source of truth.
 // ─────────────────────────────────────────────────────────────────────────────
 export function LeadDetail({
   lead,
@@ -58,12 +58,16 @@ export function LeadDetail({
   activities,
   open,
   onOpenChange,
+  onLeadUpdated,
+  onActivityCreated,
 }: {
   lead: Lead | null
   stages: LeadStage[]
   activities: LeadActivity[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  onLeadUpdated: (lead: Lead) => void
+  onActivityCreated: (activity: LeadActivity) => void
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -74,6 +78,8 @@ export function LeadDetail({
             lead={lead}
             stages={stages}
             activities={activities}
+            onLeadUpdated={onLeadUpdated}
+            onActivityCreated={onActivityCreated}
           />
         ) : null}
       </SheetContent>
@@ -87,10 +93,14 @@ function LeadDetailBody({
   lead,
   stages,
   activities,
+  onLeadUpdated,
+  onActivityCreated,
 }: {
   lead: Lead
   stages: LeadStage[]
   activities: LeadActivity[]
+  onLeadUpdated: (lead: Lead) => void
+  onActivityCreated: (activity: LeadActivity) => void
 }) {
   const router = useRouter()
   const [score, setScore] = useState(lead.score)
@@ -103,23 +113,27 @@ function LeadDetailBody({
   const [showLostForm, setShowLostForm] = useState(false)
 
   const updateAction = useAction(updateLeadAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Lead saved.")
-      router.refresh()
+      if (data?.lead) onLeadUpdated(data.lead)
     },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't save lead."),
   })
   const moveAction = useAction(moveLeadToStageAction, {
-    onSuccess: () => router.refresh(),
+    onSuccess: ({ data }) => {
+      if (data?.id && data.stageId) {
+        onLeadUpdated({ ...lead, id: data.id, stageId: data.stageId })
+      }
+    },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't move lead."),
   })
   const addActivityAction = useAction(addLeadActivityAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Activity logged.")
       setActivityText("")
-      router.refresh()
+      if (data?.activity) onActivityCreated(data.activity)
     },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't log activity."),
@@ -127,7 +141,7 @@ function LeadDetailBody({
   const convertAction = useAction(convertLeadToClientAction, {
     onSuccess: ({ data }) => {
       toast.success("Lead converted to client.")
-      router.refresh()
+      if (data?.lead) onLeadUpdated(data.lead)
       if (data?.clientId) {
         router.push(`/dashboard/clients/${data.clientId}`)
       }
@@ -136,11 +150,11 @@ function LeadDetailBody({
       toast.error(error.serverError ?? "Couldn't convert lead."),
   })
   const lostAction = useAction(markLeadLostAction, {
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Marked as lost.")
       setShowLostForm(false)
       setLostReason("")
-      router.refresh()
+      if (data?.lead) onLeadUpdated(data.lead)
     },
     onError: ({ error }) =>
       toast.error(error.serverError ?? "Couldn't mark lost."),
@@ -173,7 +187,11 @@ function LeadDetailBody({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Stage" />
+                <SelectValue placeholder="Stage">
+                  {(value) =>
+                    stages.find((s) => s.id === value)?.name ?? "Stage"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {stages.map((stage) => (
@@ -281,7 +299,13 @@ function LeadDetailBody({
                   }}
                 >
                   <SelectTrigger size="sm" className="w-32">
-                    <SelectValue />
+                    <SelectValue>
+                      {(value) =>
+                        typeof value === "string"
+                          ? value.charAt(0).toUpperCase() + value.slice(1)
+                          : ""
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="note">Note</SelectItem>

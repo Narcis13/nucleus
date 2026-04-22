@@ -13,46 +13,52 @@ import {
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { useAction } from "next-safe-action/hooks"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
+import { PageHeader } from "@/components/shared/page-header"
 import { moveLeadToStageAction } from "@/lib/actions/leads"
 import type { Lead, LeadActivity, LeadStage } from "@/types/domain"
 
 import { KanbanColumn } from "./kanban-column"
 import { LeadCard } from "./lead-card"
 import { LeadDetail } from "./lead-detail"
+import { StageManager } from "./stage-manager"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// <KanbanBoard>
+// <LeadsPipeline>
 //
-// DndContext root for the lead pipeline. Each column is its own SortableContext
-// (per `@dnd-kit/sortable` recommendation for cross-list drag); we listen to
-// `onDragEnd` to detect drops onto a different column and call the move
-// Server Action with optimistic UI + rollback on failure.
+// Client container for /dashboard/leads. Holds the single source of truth for
+// stages, leads, and activities. Server actions return the updated rows and
+// we merge them into local state — no `revalidatePath` on this page because
+// Next 16 dev's RSC streaming crashes when re-rendering during the action
+// response (see project memory).
 // ─────────────────────────────────────────────────────────────────────────────
-
-export function KanbanBoard({
-  stages,
+export function LeadsPipeline({
+  stages: initialStages,
   leads: initialLeads,
-  activities,
+  activities: initialActivities,
 }: {
   stages: LeadStage[]
   leads: Lead[]
   activities: LeadActivity[]
 }) {
+  const [stages, setStages] = useState<LeadStage[]>(initialStages)
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
+  const [activities, setActivities] =
+    useState<LeadActivity[]>(initialActivities)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
 
-  // Re-seed from the server prop whenever it changes (another action on the
-  // page — adding a lead, converting one — calls revalidatePath and this prop
-  // updates). The move action deliberately skips `revalidatePath` to avoid a
-  // Next 16 RSC chunk-map race on rapid-fire drags, so in that path
-  // `initialLeads` is stable and this effect is a no-op.
+  useEffect(() => {
+    setStages(initialStages)
+  }, [initialStages])
   useEffect(() => {
     setLeads(initialLeads)
   }, [initialLeads])
+  useEffect(() => {
+    setActivities(initialActivities)
+  }, [initialActivities])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -61,10 +67,38 @@ export function KanbanBoard({
     }),
   )
 
+  const upsertLead = useCallback((lead: Lead) => {
+    setLeads((prev) => {
+      const idx = prev.findIndex((l) => l.id === lead.id)
+      if (idx === -1) return [lead, ...prev]
+      const next = prev.slice()
+      next[idx] = lead
+      return next
+    })
+  }, [])
+
+  const upsertActivity = useCallback((activity: LeadActivity) => {
+    setActivities((prev) => [activity, ...prev])
+  }, [])
+
+  const upsertStage = useCallback((stage: LeadStage) => {
+    setStages((prev) => {
+      const idx = prev.findIndex((s) => s.id === stage.id)
+      if (idx === -1)
+        return [...prev, stage].sort((a, b) => a.position - b.position)
+      const next = prev.slice()
+      next[idx] = stage
+      return next.sort((a, b) => a.position - b.position)
+    })
+  }, [])
+
+  const removeStage = useCallback((stageId: string) => {
+    setStages((prev) => prev.filter((s) => s.id !== stageId))
+  }, [])
+
   const moveAction = useAction(moveLeadToStageAction, {
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't move lead.")
-      // Rollback by re-syncing from the server-provided list.
       setLeads(initialLeads)
     },
   })
@@ -96,8 +130,6 @@ export function KanbanBoard({
     const lead = leads.find((l) => l.id === activeLeadId)
     if (!lead) return
 
-    // `over.id` is either another lead's id (when hovering over a card) or a
-    // column id prefixed with "stage:". Resolve to a target stage either way.
     const overId = String(over.id)
     let targetStageId: string | null = null
     if (overId.startsWith("stage:")) {
@@ -123,8 +155,21 @@ export function KanbanBoard({
     ? activities.filter((a) => a.leadId === openLead.id)
     : []
 
+  const summary = `${leads.length} ${leads.length === 1 ? "lead" : "leads"} across ${stages.length} ${stages.length === 1 ? "stage" : "stages"}.`
+
   return (
-    <>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Leads"
+        description={summary}
+        actions={
+          <StageManager
+            stages={stages}
+            onStageUpserted={upsertStage}
+            onStageRemoved={removeStage}
+          />
+        }
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -138,6 +183,7 @@ export function KanbanBoard({
               stage={stage}
               leads={leadsByStage.get(stage.id) ?? []}
               onLeadClick={(id) => setOpenLeadId(id)}
+              onLeadCreated={upsertLead}
             />
           ))}
         </div>
@@ -155,7 +201,9 @@ export function KanbanBoard({
         onOpenChange={(open) => {
           if (!open) setOpenLeadId(null)
         }}
+        onLeadUpdated={upsertLead}
+        onActivityCreated={upsertActivity}
       />
-    </>
+    </div>
   )
 }

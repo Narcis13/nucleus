@@ -15,6 +15,7 @@ import {
   createStage as createStageQuery,
   deleteStage as deleteStageQuery,
   ensureDefaultStages,
+  getLead as getLeadQuery,
   getStages,
   markLeadLost as markLeadLostQuery,
   moveLeadToStage as moveLeadToStageQuery,
@@ -143,8 +144,7 @@ export const createLeadAction = authedAction
       source: parsedInput.source || null,
     })
 
-    revalidatePath("/dashboard/leads")
-    return { id: created.id, stageId }
+    return { lead: created }
   })
 
 export const updateLeadAction = authedAction
@@ -161,8 +161,7 @@ export const updateLeadAction = authedAction
     if (rest.notes !== undefined) patch.notes = rest.notes
     const updated = await updateLeadQuery(id, patch)
     if (!updated) throw new ActionError("Lead not found.")
-    revalidatePath("/dashboard/leads")
-    return { id: updated.id }
+    return { lead: updated }
   })
 
 export const moveLeadToStageAction = authedAction
@@ -192,8 +191,7 @@ export const addLeadActivityAction = authedAction
       type: parsedInput.type,
       description: parsedInput.description,
     })
-    revalidatePath("/dashboard/leads")
-    return { id: activity.id }
+    return { activity }
   })
 
 export const convertLeadToClientAction = authedAction
@@ -212,9 +210,12 @@ export const convertLeadToClientAction = authedAction
         clientId: result.clientId,
       })
     }
-    revalidatePath("/dashboard/leads")
+    // The user is navigated to the client profile after this; refresh the
+    // clients list so the new row appears there. The leads page uses local
+    // state for optimistic updates, so no leads revalidate here.
     revalidatePath("/dashboard/clients")
-    return result
+    const updatedLead = await getLeadQuery(result.leadId)
+    return { ...result, lead: updatedLead }
   })
 
 export const markLeadLostAction = authedAction
@@ -226,8 +227,7 @@ export const markLeadLostAction = authedAction
       parsedInput.reason,
     )
     if (!updated) throw new ActionError("Lead not found.")
-    revalidatePath("/dashboard/leads")
-    return { id: updated.id }
+    return { lead: updated }
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -251,8 +251,7 @@ export const createStageAction = authedAction
       isWon: parsedInput.isWon ?? false,
       isLost: parsedInput.isLost ?? false,
     })
-    revalidatePath("/dashboard/leads")
-    return { id: created.id }
+    return { stage: created }
   })
 
 export const updateStageAction = authedAction
@@ -262,8 +261,7 @@ export const updateStageAction = authedAction
     const { id, ...rest } = parsedInput
     const updated = await updateStageQuery(id, rest)
     if (!updated) throw new ActionError("Stage not found.")
-    revalidatePath("/dashboard/leads")
-    return { id: updated.id }
+    return { stage: updated }
   })
 
 export const reorderStagesAction = authedAction
@@ -271,7 +269,6 @@ export const reorderStagesAction = authedAction
   .inputSchema(reorderStagesSchema)
   .action(async ({ parsedInput }) => {
     await reorderStagesQuery(parsedInput.ordered)
-    revalidatePath("/dashboard/leads")
     return { ok: true }
   })
 
@@ -287,6 +284,5 @@ export const deleteStageAction = authedAction
     if (!result.deleted) {
       throw new ActionError(result.reason ?? "Couldn't delete stage.")
     }
-    revalidatePath("/dashboard/leads")
-    return { ok: true }
+    return { id: parsedInput.id }
   })
