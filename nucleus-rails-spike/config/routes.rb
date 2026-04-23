@@ -8,6 +8,15 @@ Rails.application.routes.draw do
   get "sign-in", to: "sessions#new", as: :sign_in
   get "dashboard", to: "dashboard#index", as: :dashboard
 
+  get  "billing",          to: "billings#show",     as: :billing
+  get  "billing/upgrade",  to: "billings#upgrade",  as: :billing_upgrade
+  post "billing/checkout", to: "billings#checkout", as: :billing_checkout
+  post "billing/portal",   to: "billings#portal",   as: :billing_portal
+
+  # Pay auto-mounts its engine at /pay (see Pay.automount_routes). The Stripe
+  # webhook lands at /pay/webhooks/stripe with signature verification handled
+  # by Pay internally.
+
   namespace :webhooks do
     post "clerk", to: "clerk#create"
   end

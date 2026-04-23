@@ -51,6 +51,12 @@ gem "svix"
 # Spike Day 3 — Multi-tenancy (app layer). RLS policy lives in a migration.
 gem "acts_as_tenant"
 
+# Spike Day 5 — Stripe subscriptions via Pay gem. Plan pinned ~> 8.0; current
+# stable is 11.x so we track the current major (Rails 8 support lives there).
+gem "pay", "~> 11.0"
+gem "stripe", "~> 19.0"
+gem "receipts", "~> 2.0"
+
 group :development, :test do
   gem "dotenv-rails"
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
