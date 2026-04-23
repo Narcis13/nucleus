@@ -1,0 +1,33 @@
+# Monorepo-wide pre-commit hooks.
+# Currently only nucleus-rails/ is actively developed; each command is glob-scoped
+# so commits that don't touch Rails files skip the full Ruby toolchain.
+#
+# `root:` makes lefthook `cd` into nucleus-rails/ before running the command AND
+# rewrites {staged_files} to be relative to that root (so rubocop doesn't see a
+# doubled `nucleus-rails/nucleus-rails/...` path).
+#
+# `mise exec --` wraps `bundle exec` because git hooks run without mise
+# activated and would otherwise fall back to macOS system Ruby 2.6.
+
+pre-commit:
+  parallel: true
+  commands:
+    rubocop:
+      root: "nucleus-rails/"
+      glob: "*.{rb,rake,ru}"
+      run: mise exec -- bundle exec rubocop --force-exclusion {staged_files}
+    brakeman:
+      root: "nucleus-rails/"
+      glob: "*.{rb,rake,ru,erb}"
+      run: mise exec -- bundle exec brakeman --quiet --no-pager --force-scan
+    rspec:
+      root: "nucleus-rails/"
+      glob: "*.{rb,rake,ru}"
+      run: mise exec -- bundle exec rspec --fail-fast
+
+pre-push:
+  commands:
+    bundler-audit:
+      root: "nucleus-rails/"
+      glob: "Gemfile.lock"
+      run: mise exec -- bundle exec bundle-audit check --update
