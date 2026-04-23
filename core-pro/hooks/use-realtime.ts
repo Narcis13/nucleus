@@ -71,6 +71,18 @@ export type UseMessagesOptions = {
   initial?: Message[]
 }
 
+// Event name for the optimistic-append bridge — see `useMessages` below.
+// Dispatch a `CustomEvent<Message>` with this name to inject a row into any
+// mounted thread listener for the matching conversation.
+export const MESSAGES_APPEND_EVENT = "nucleus:messages:append"
+
+export function dispatchMessageAppend(message: Message) {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(
+    new CustomEvent<Message>(MESSAGES_APPEND_EVENT, { detail: message }),
+  )
+}
+
 // Subscribes to INSERT + UPDATE on `messages` filtered to a single conversation.
 // Returns the running list sorted ascending (oldest → newest) so consumers can
 // render directly without re-sorting on every tick.
@@ -95,6 +107,24 @@ export function useMessages(
     // Deliberately ignoring `options.initial` — it's re-allocated on every
     // render by the caller, which would defeat the seed guard above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId])
+
+  // Optimistic-append bridge. Callers (dev-only simulate button; any other
+  // client that just inserted a row) can dispatch a `messages:append` event
+  // to inject a message into the running list without waiting for realtime
+  // or an RSC revalidate. Idempotent: the existing dedupe by id handles the
+  // case where realtime also delivers it a beat later.
+  useEffect(() => {
+    if (!conversationId) return
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<Message>).detail
+      if (!detail || detail.conversationId !== conversationId) return
+      setMessages((prev) =>
+        prev.some((m) => m.id === detail.id) ? prev : [...prev, detail],
+      )
+    }
+    window.addEventListener(MESSAGES_APPEND_EVENT, handler)
+    return () => window.removeEventListener(MESSAGES_APPEND_EVENT, handler)
   }, [conversationId])
 
   useEffect(() => {
@@ -155,17 +185,24 @@ export type ConversationsFilter = {
   clientId?: string | null
 }
 
+export type ConversationEvent = {
+  conversation: Conversation
+  kind: "INSERT" | "UPDATE" | "DELETE"
+}
+
 // Subscribes to INSERT + UPDATE on `conversations` scoped by either the
-// professional or client id (whichever side the caller is on). Consumers use
-// the `tick` value as a cue to refresh their server-provided list — we don't
-// try to hydrate a full joined ConversationListItem inside this hook.
+// professional or client id (whichever side the caller is on), and to any
+// `messages` INSERT so the list can update previews + unread counts without
+// a server round-trip. Consumers apply these events to client-side state —
+// no router.refresh(), no revalidatePath (rapid-fire causes RSC races).
 export function useConversations(filter: ConversationsFilter): {
-  tick: number
-  lastEvent: Conversation | null
+  lastConversationEvent: ConversationEvent | null
+  lastMessageEvent: Message | null
 } {
   const supabase = useSupabaseBrowser()
-  const [tick, setTick] = useState(0)
-  const [lastEvent, setLastEvent] = useState<Conversation | null>(null)
+  const [lastConversationEvent, setLastConversationEvent] =
+    useState<ConversationEvent | null>(null)
+  const [lastMessageEvent, setLastMessageEvent] = useState<Message | null>(null)
 
   const professionalId = filter.professionalId ?? null
   const clientId = filter.clientId ?? null
@@ -188,8 +225,11 @@ export function useConversations(filter: ConversationsFilter): {
         },
         (payload: RealtimePostgresChangesPayload<ConversationRow>) => {
           const row = (payload.new ?? payload.old) as ConversationRow
-          if (row) setLastEvent(toConversation(row))
-          setTick((n) => n + 1)
+          if (!row) return
+          setLastConversationEvent({
+            conversation: toConversation(row),
+            kind: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
+          })
         },
       )
       .on(
@@ -199,11 +239,10 @@ export function useConversations(filter: ConversationsFilter): {
           schema: "public",
           table: "messages",
         },
-        () => {
-          // Any new message anywhere can bump `last_message_at` on one of our
-          // conversations — cheapest way to keep unread counts fresh is a
-          // tick. The consumer re-fetches the list server-side.
-          setTick((n) => n + 1)
+        (payload: RealtimePostgresChangesPayload<MessageRow>) => {
+          const row = payload.new as MessageRow
+          if (!row) return
+          setLastMessageEvent(toMessage(row))
         },
       )
       .subscribe()
@@ -213,5 +252,5 @@ export function useConversations(filter: ConversationsFilter): {
     }
   }, [supabase, professionalId, clientId])
 
-  return { tick, lastEvent }
+  return { lastConversationEvent, lastMessageEvent }
 }

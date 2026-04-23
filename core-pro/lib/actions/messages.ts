@@ -1,11 +1,11 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { ActionError, authedAction } from "@/lib/actions/safe-action"
 import {
+  getMessages as getMessagesQuery,
   getOrCreateConversation as getOrCreateConversationQuery,
   markMessagesRead,
   sendMessage as sendMessageQuery,
@@ -13,8 +13,9 @@ import {
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { trackServerEvent } from "@/lib/posthog/events"
 import { dbAdmin } from "@/lib/db/client"
-import { clients } from "@/lib/db/schema"
+import { clients, conversations } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+import { env } from "@/lib/env"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemas — shared between the chat UIs (dashboard + portal). Message content
@@ -68,12 +69,20 @@ export const sendMessageAction = authedAction
       })
     }
 
-    // Revalidate both sides — the list previews and unread badges depend on
-    // the bumped `last_message_at` and the new row. Realtime handles the
-    // live rendering; revalidation is the safety net for a cold reload.
-    revalidatePath("/dashboard/messages")
-    revalidatePath("/portal/messages")
-    return { id: created.id, createdAt: created.createdAt.toISOString() }
+    // No revalidatePath here: Realtime + optimistic client state carry the
+    // UI. revalidatePath on a rapid-fire path stacks RSC renders and races
+    // with router.refresh() elsewhere (see feedback memory on Next 16).
+    return {
+      id: created.id,
+      conversationId: created.conversationId,
+      senderId: created.senderId,
+      senderRole: created.senderRole,
+      content: created.content,
+      type: created.type,
+      mediaUrl: created.mediaUrl,
+      readAt: created.readAt ? created.readAt.toISOString() : null,
+      createdAt: created.createdAt.toISOString(),
+    }
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,6 +100,33 @@ export const getOrCreateConversationAction = authedAction
     return { id: conversation.id }
   })
 
+// Single round-trip for the inline client-profile chat tab: opens (or
+// creates) the conversation and returns it with its existing messages. The
+// tab uses this to hydrate without a second request.
+export const openClientConversationAction = authedAction
+  .metadata({ actionName: "messages.openClientConversation" })
+  .inputSchema(getOrCreateSchema)
+  .action(async ({ parsedInput }) => {
+    const professional = await getProfessional()
+    if (!professional) throw new ActionError("Unauthorized")
+    const conversation = await getOrCreateConversationQuery(parsedInput.clientId)
+    const messages = await getMessagesQuery(conversation.id)
+    return {
+      conversationId: conversation.id,
+      messages: messages.map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        senderId: m.senderId,
+        senderRole: m.senderRole,
+        content: m.content,
+        type: m.type,
+        mediaUrl: m.mediaUrl,
+        readAt: m.readAt ? m.readAt.toISOString() : null,
+        createdAt: m.createdAt.toISOString(),
+      })),
+    }
+  })
+
 // ─────────────────────────────────────────────────────────────────────────────
 // markMessagesAsReadAction — marks the *incoming* side of the thread as read
 // for the caller. Idempotent; returns the number of rows flipped.
@@ -102,9 +138,62 @@ export const markMessagesAsReadAction = authedAction
     const sender = await resolveSender()
     if (!sender) throw new ActionError("Unauthorized")
     const result = await markMessagesRead(parsedInput.conversationId, sender.role)
-    revalidatePath("/dashboard/messages")
-    revalidatePath("/portal/messages")
+    // No revalidate: the UPDATE broadcasts via Realtime and optimistic
+    // client state clears unread badges without an RSC round-trip.
     return { count: result.length }
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// simulateClientReplyAction — DEV-ONLY. Inserts a message into the given
+// conversation as if the client had sent it, so a solo developer can test the
+// two-way realtime flow without running a second Clerk session in the portal.
+// Production requests are rejected; the message goes through the same insert
+// path as a real send so Realtime + unread counts + revalidation all behave
+// identically.
+// ─────────────────────────────────────────────────────────────────────────────
+const simulateSchema = z.object({
+  conversationId: z.string().uuid(),
+  content: z.string().min(1).max(4000),
+})
+
+export const simulateClientReplyAction = authedAction
+  .metadata({ actionName: "messages.simulateClientReply" })
+  .inputSchema(simulateSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    if (env.NODE_ENV === "production") {
+      throw new ActionError("Not available in production.")
+    }
+
+    const professional = await getProfessional()
+    if (!professional) throw new ActionError("Unauthorized")
+
+    // Resolve the conversation's clientId via the RLS-scoped tx — this
+    // doubles as authorization (the pro can only see their own threads).
+    const [convo] = await ctx.db
+      .select({ clientId: conversations.clientId })
+      .from(conversations)
+      .where(eq(conversations.id, parsedInput.conversationId))
+      .limit(1)
+    if (!convo) throw new ActionError("Conversation not found")
+
+    const created = await sendMessageQuery({
+      conversationId: parsedInput.conversationId,
+      senderId: convo.clientId,
+      senderRole: "client",
+      content: parsedInput.content.trim(),
+    })
+
+    return {
+      id: created.id,
+      conversationId: created.conversationId,
+      senderId: created.senderId,
+      senderRole: created.senderRole,
+      content: created.content,
+      type: created.type,
+      mediaUrl: created.mediaUrl,
+      readAt: created.readAt ? created.readAt.toISOString() : null,
+      createdAt: created.createdAt.toISOString(),
+    }
   })
 
 // ─────────────────────────────────────────────────────────────────────────────

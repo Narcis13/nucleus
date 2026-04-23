@@ -13,11 +13,9 @@ import {
   assignFormToClients as assignFormQuery,
   createForm as createFormQuery,
   getExistingAssignmentsForClients,
-  getForm,
-  submitFormResponse as submitFormResponseQuery,
   updateForm as updateFormQuery,
 } from "@/lib/db/queries/forms"
-import { formAssignments } from "@/lib/db/schema"
+import { formAssignments, formResponses, forms } from "@/lib/db/schema"
 import { validateFormResponse } from "@/lib/forms/validate"
 import type { FormResponseData, FormSchema } from "@/types/forms"
 
@@ -193,7 +191,11 @@ export const submitFormResponseAction = authedAction
       throw new ActionError("This form was already submitted.")
     }
 
-    const form = await getForm(assignment.formId)
+    const [form] = await ctx.db
+      .select()
+      .from(forms)
+      .where(eq(forms.id, assignment.formId))
+      .limit(1)
     if (!form) throw new ActionError("Form not found.")
 
     const errors = validateFormResponse(
@@ -208,12 +210,21 @@ export const submitFormResponseAction = authedAction
       throw new ActionError(errors[firstKey])
     }
 
-    const response = await submitFormResponseQuery({
-      assignmentId: assignment.id,
-      clientId: assignment.clientId,
-      formId: assignment.formId,
-      data: parsedInput.data as FormResponseData,
-    })
+    const [response] = await ctx.db
+      .insert(formResponses)
+      .values({
+        assignmentId: assignment.id,
+        clientId: assignment.clientId,
+        formId: assignment.formId,
+        data: parsedInput.data as FormResponseData,
+      })
+      .returning()
+    if (!response) throw new ActionError("Failed to save response.")
+
+    await ctx.db
+      .update(formAssignments)
+      .set({ status: "completed" })
+      .where(eq(formAssignments.id, assignment.id))
 
     void evaluateTrigger("form_submitted", {
       type: "form_submitted",
@@ -225,13 +236,17 @@ export const submitFormResponseAction = authedAction
 
     const { userId } = await auth()
     if (userId) {
-      void trackServerEvent("form_submitted", {
-        distinctId: userId,
-        professionalId: assignment.professionalId,
-        formId: assignment.formId,
-        assignmentId: assignment.id,
-        clientId: assignment.clientId,
-      })
+      try {
+        await trackServerEvent("form_submitted", {
+          distinctId: userId,
+          professionalId: assignment.professionalId,
+          formId: assignment.formId,
+          assignmentId: assignment.id,
+          clientId: assignment.clientId,
+        })
+      } catch {
+        // Analytics failures must not block form submission.
+      }
     }
 
     revalidatePath("/portal/forms")

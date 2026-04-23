@@ -6,6 +6,7 @@ import {
   ArrowUpDown,
   Download,
   Filter,
+  MessageSquare,
   MoreHorizontal,
   Plus,
   Search,
@@ -62,6 +63,7 @@ import {
   bulkAddTagAction,
   exportClientsAction,
 } from "@/lib/actions/clients"
+import { getOrCreateConversationAction } from "@/lib/actions/messages"
 import type { ClientListItem } from "@/lib/db/queries/clients"
 import type { Tag } from "@/types/domain"
 
@@ -115,6 +117,25 @@ export function ClientTable({
       toast.error(error.serverError ?? "Couldn't archive client.")
     },
   })
+
+  // Track which row is busy opening a conversation so only that button shows
+  // a spinner — not every row.
+  const [openingClientId, setOpeningClientId] = useState<string | null>(null)
+  const openConversationAction = useAction(getOrCreateConversationAction, {
+    onSuccess: ({ data }) => {
+      setOpeningClientId(null)
+      if (!data?.id) return
+      router.push(`/dashboard/messages?c=${data.id}`)
+    },
+    onError: ({ error }) => {
+      setOpeningClientId(null)
+      toast.error(error.serverError ?? "Couldn't open conversation.")
+    },
+  })
+  const openConversation = (clientId: string) => {
+    setOpeningClientId(clientId)
+    openConversationAction.execute({ clientId })
+  }
 
   const exportAction = useAction(exportClientsAction, {
     onSuccess: ({ data }) => {
@@ -389,37 +410,55 @@ export function ClientTable({
                     {row.relationship.createdAt.toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Row actions"
-                          />
-                        }
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Message ${row.client.fullName}`}
+                        title="Message"
+                        disabled={openingClientId === row.client.id}
+                        onClick={() => openConversation(row.client.id)}
                       >
-                        <MoreHorizontal className="size-3.5" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
+                        <MessageSquare className="size-3.5" />
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
                           render={
-                            <Link href={`/dashboard/clients/${row.client.id}`} />
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Row actions"
+                            />
                           }
                         >
-                          View profile
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() =>
-                            archiveAction.execute({ id: row.client.id })
-                          }
-                        >
-                          Archive
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <MoreHorizontal className="size-3.5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            render={
+                              <Link href={`/dashboard/clients/${row.client.id}`} />
+                            }
+                          >
+                            View profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openConversation(row.client.id)}
+                          >
+                            <MessageSquare className="size-3.5" />
+                            Message
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() =>
+                              archiveAction.execute({ id: row.client.id })
+                            }
+                          >
+                            Archive
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               )

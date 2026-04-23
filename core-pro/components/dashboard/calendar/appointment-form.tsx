@@ -1,5 +1,6 @@
 "use client"
 
+import { AlertTriangle } from "lucide-react"
 import { useAction } from "next-safe-action/hooks"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -14,12 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { isRangeWithinAvailability } from "@/components/dashboard/calendar/calendar-grid"
 import {
   cancelAppointmentAction,
   createAppointmentAction,
   updateAppointmentAction,
 } from "@/lib/actions/appointments"
-import type { Appointment } from "@/types/domain"
+import type { Appointment, AvailabilitySlot } from "@/types/domain"
 
 // Create/edit/cancel dialog body for the calendar. Lives outside <Dialog> so
 // the parent owns open state — that's how the calendar grid can drive the
@@ -39,6 +41,7 @@ export type AppointmentFormProps = {
   defaultStart?: Date | null
   clients: ClientChoice[]
   services: ServiceChoice[]
+  availability?: AvailabilitySlot[]
   onDone: (result: AppointmentFormResult) => void
 }
 
@@ -61,10 +64,20 @@ export function AppointmentForm({
   defaultStart,
   clients,
   services,
+  availability,
   onDone,
 }: AppointmentFormProps) {
   const isEdit = Boolean(initial)
   const [form, setForm] = useState(() => initialState(initial, defaultStart))
+
+  const outsideAvailability = useMemo(() => {
+    if (!availability || availability.length === 0) return false
+    if (!form.date || !form.startTime || !form.endTime) return false
+    const start = combineDateTime(form.date, form.startTime)
+    const end = combineDateTime(form.date, form.endTime)
+    if (end <= start) return false
+    return !isRangeWithinAvailability(start, end, availability)
+  }, [availability, form.date, form.startTime, form.endTime])
 
   // Base UI `<Select.Value>` renders the label of the selected item when the
   // root Select is given an `items` prop — otherwise it falls back to the raw
@@ -274,6 +287,16 @@ export function AppointmentForm({
           />
         </div>
       </div>
+
+      {outsideAvailability && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          <AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            This time is outside your weekly availability. The appointment will
+            still be saved.
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div>

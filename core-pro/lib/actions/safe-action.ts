@@ -30,6 +30,12 @@ const baseClient = createSafeActionClient({
         actionName: utils.metadata?.actionName ?? "unknown",
       },
     })
+    if (process.env.NODE_ENV !== "production") {
+      console.error(
+        `[action:${utils.metadata?.actionName ?? "unknown"}]`,
+        error,
+      )
+    }
     if (error instanceof ActionError) {
       return error.message
     }

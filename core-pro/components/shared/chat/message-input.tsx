@@ -13,6 +13,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { dispatchMessageAppend } from "@/hooks/use-realtime"
 import { sendMessageAction } from "@/lib/actions/messages"
 import { useSupabaseBrowser } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -50,6 +51,23 @@ export function MessageInput({
   const supabase = useSupabaseBrowser()
 
   const { execute, isExecuting } = useAction(sendMessageAction, {
+    onSuccess: ({ data }) => {
+      if (!data) return
+      // Append immediately on the sender side so the bubble appears without
+      // waiting for the Realtime round-trip. `useMessages` dedupes by id
+      // when the same row arrives via the channel a beat later.
+      dispatchMessageAppend({
+        id: data.id,
+        conversationId: data.conversationId,
+        senderId: data.senderId,
+        senderRole: data.senderRole,
+        content: data.content,
+        type: data.type,
+        mediaUrl: data.mediaUrl,
+        readAt: data.readAt ? new Date(data.readAt) : null,
+        createdAt: new Date(data.createdAt),
+      })
+    },
     onError: ({ error }) => {
       toast.error(error.serverError ?? "Couldn't send message.")
     },

@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import type { CSSProperties } from "react"
 
+import { BreadcrumbProvider } from "@/components/dashboard/breadcrumb-context"
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs"
 import { MobileNav } from "@/components/dashboard/mobile-nav"
 import { Sidebar } from "@/components/dashboard/sidebar"
@@ -51,34 +52,36 @@ export default async function DashboardLayout({
   const style = brandingToStyle(branding)
 
   return (
-    <div
-      className="flex min-h-dvh w-full bg-background text-foreground"
-      style={style}
-    >
-      {/* Desktop sidebar */}
-      <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">
-        <Sidebar
-          initialCollapsed={collapsed}
-          brandName={brandName}
-          brandLogoUrl={brandLogoUrl}
-        />
+    <BreadcrumbProvider>
+      <div
+        className="flex min-h-dvh w-full bg-background text-foreground"
+        style={style}
+      >
+        {/* Desktop sidebar */}
+        <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">
+          <Sidebar
+            initialCollapsed={collapsed}
+            brandName={brandName}
+            brandLogoUrl={brandLogoUrl}
+          />
+        </div>
+
+        {/* Main column */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar brandName={brandName} brandLogoUrl={brandLogoUrl} />
+
+          <main className="flex min-w-0 flex-1 flex-col pb-16 lg:pb-0">
+            <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 sm:px-6 sm:py-6">
+              <Breadcrumbs className="mb-3" />
+              {children}
+            </div>
+          </main>
+        </div>
+
+        <MobileNav />
+        <Toaster position="top-right" richColors closeButton />
       </div>
-
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar brandName={brandName} brandLogoUrl={brandLogoUrl} />
-
-        <main className="flex min-w-0 flex-1 flex-col pb-16 lg:pb-0">
-          <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 sm:px-6 sm:py-6">
-            <Breadcrumbs className="mb-3" />
-            {children}
-          </div>
-        </main>
-      </div>
-
-      <MobileNav />
-      <Toaster position="top-right" richColors closeButton />
-    </div>
+    </BreadcrumbProvider>
   )
 }
 

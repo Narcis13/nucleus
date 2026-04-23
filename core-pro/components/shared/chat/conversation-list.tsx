@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { useConversations } from "@/hooks/use-realtime"
 import { cn, getInitials } from "@/lib/utils"
+import type { Message } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // <ConversationList>
@@ -41,25 +42,78 @@ export function ConversationList({
   const router = useRouter()
   const [query, setQuery] = useState("")
 
-  // Tick-based cache invalidation — when the realtime hook reports any
-  // conversation-level change, we refresh the page so the server-rendered
-  // list (with its fresh previews + unread counts) updates.
-  const { tick } = useConversations({ professionalId })
+  // Local mirror of the server-provided list. We apply Realtime events
+  // optimistically (preview + unread + reorder) instead of router.refresh(),
+  // which collides with RSC rendering on rapid-fire bursts.
+  const [items, setItems] = useState<ConversationListItem[]>(conversations)
+
+  // Re-seed when the server payload genuinely changes (e.g., user navigates
+  // back here from another page). Compare by a composite key so we don't
+  // clobber our optimistic state on every parent re-render.
+  const seedKey = useMemo(
+    () =>
+      conversations
+        .map((c) => `${c.id}:${c.lastMessageAt ?? ""}:${c.unreadCount}`)
+        .join("|"),
+    [conversations],
+  )
   useEffect(() => {
-    if (tick > 0) router.refresh()
-    // Router + tick-only; intentional.
+    setItems(conversations)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick])
+  }, [seedKey])
+
+  const { lastConversationEvent, lastMessageEvent } = useConversations({
+    professionalId,
+  })
+
+  // New message anywhere → update the matching row's preview + unread.
+  useEffect(() => {
+    if (!lastMessageEvent) return
+    applyMessage(setItems, lastMessageEvent, selectedId)
+  }, [lastMessageEvent, selectedId])
+
+  // New/updated conversation. INSERT of an id we've never seen means a fresh
+  // thread was just created elsewhere — rare, so a single router.refresh()
+  // picks up the joined client info without hammering RSC.
+  useEffect(() => {
+    if (!lastConversationEvent) return
+    const { conversation, kind } = lastConversationEvent
+    if (kind === "INSERT") {
+      const known = items.some((i) => i.id === conversation.id)
+      if (!known) router.refresh()
+    } else if (kind === "UPDATE") {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === conversation.id
+            ? { ...i, lastMessageAt: conversation.lastMessageAt }
+            : i,
+        ),
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastConversationEvent])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return conversations
-    return conversations.filter((c) => c.clientName.toLowerCase().includes(q))
-  }, [conversations, query])
+    const base = q
+      ? items.filter((c) => c.clientName.toLowerCase().includes(q))
+      : items
+    // Newest-first, stable when timestamps are equal.
+    return [...base].sort((a, b) => {
+      const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
+      const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
+      return bt - at
+    })
+  }, [items, query])
 
   const onSelect = (id: string) => {
     const params = new URLSearchParams(window.location.search)
     params.set("c", id)
+    // Selecting a row clears its unread locally — mark-read runs on the
+    // thread side and the UPDATE broadcasts to the other side via Realtime.
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, unreadCount: 0 } : i)),
+    )
     router.push(`/dashboard/messages?${params.toString()}`)
   }
 
@@ -137,6 +191,35 @@ export function ConversationList({
       </div>
     </div>
   )
+}
+
+// Merges a new message into the list: bumps `lastMessageAt`, updates
+// preview, and increments unread only when it's a *client* message on a
+// thread the pro doesn't currently have open.
+function applyMessage(
+  setItems: React.Dispatch<React.SetStateAction<ConversationListItem[]>>,
+  message: Message,
+  selectedId: string | null,
+) {
+  const preview =
+    message.content ??
+    (message.type === "image" ? "📷 Photo" : message.type === "file" ? "📎 Attachment" : "")
+  setItems((prev) => {
+    const idx = prev.findIndex((i) => i.id === message.conversationId)
+    if (idx === -1) return prev // unknown — conversation INSERT will trigger a refresh
+    const row = prev[idx]
+    const inc =
+      message.senderRole === "client" && message.conversationId !== selectedId
+        ? 1
+        : 0
+    const next: ConversationListItem = {
+      ...row,
+      lastMessageAt: message.createdAt,
+      lastMessagePreview: preview,
+      unreadCount: row.unreadCount + inc,
+    }
+    return [...prev.slice(0, idx), next, ...prev.slice(idx + 1)]
+  })
 }
 
 function formatRelativeTime(date: Date | string | null): string {

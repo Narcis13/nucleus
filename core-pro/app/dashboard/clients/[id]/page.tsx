@@ -14,6 +14,7 @@ import {
   getClientWithRelationship,
   getTags,
 } from "@/lib/db/queries/clients"
+import { getProfessional } from "@/lib/db/queries/professionals"
 
 export default async function ClientProfilePage({
   params,
@@ -23,7 +24,7 @@ export default async function ClientProfilePage({
   const { id } = await params
 
   // Parallel fetches — all scoped by RLS to the current professional.
-  const [detail, activity, documents, forms, invoices, allTags] =
+  const [detail, activity, documents, forms, invoices, allTags, professional] =
     await Promise.all([
       getClientWithRelationship(id),
       getClientActivity(id),
@@ -31,9 +32,11 @@ export default async function ClientProfilePage({
       getClientForms(id),
       getClientInvoices(id),
       getTags(),
+      getProfessional(),
     ])
 
   if (!detail) notFound()
+  if (!professional) notFound()
 
   const { client, relationship, tags } = detail
   const initials = client.fullName
@@ -114,6 +117,7 @@ export default async function ClientProfilePage({
         documents={documents}
         forms={forms}
         invoices={invoices}
+        professionalId={professional.id}
       />
     </div>
   )

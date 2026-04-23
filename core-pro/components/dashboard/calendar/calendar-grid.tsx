@@ -9,7 +9,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { AlertTriangle, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { useAction } from "next-safe-action/hooks"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -192,6 +192,9 @@ export function CalendarGrid({
           : e,
       ),
     )
+    if (!isRangeWithinAvailability(newStart, newEnd, availability)) {
+      toast.warning("Scheduled outside your weekly availability.")
+    }
     reschedule.execute({
       id: ev.id,
       startAt: newStart.toISOString(),
@@ -338,6 +341,7 @@ export function CalendarGrid({
           <TimeGrid
             days={visibleDays}
             events={events}
+            availability={availability}
             onEditEvent={onEdit}
             onCreateAt={onCreate}
           />
@@ -346,6 +350,7 @@ export function CalendarGrid({
         <TimeGrid
           days={visibleDays}
           events={events}
+          availability={availability}
           onEditEvent={onEdit}
           onCreateAt={onCreate}
         />
@@ -363,6 +368,7 @@ export function CalendarGrid({
             defaultStart={creatingAt}
             clients={clients}
             services={services}
+            availability={availability}
             onDone={(result) => {
               setDialogOpen(false)
               // Create/update/cancel actions deliberately do NOT call
@@ -384,11 +390,13 @@ export function CalendarGrid({
 function TimeGrid({
   days,
   events,
+  availability,
   onEditEvent,
   onCreateAt,
 }: {
   days: Date[]
   events: CalendarEvent[]
+  availability: AvailabilitySlot[]
   onEditEvent: (id: string) => void
   onCreateAt: (at: Date) => void
 }) {
@@ -443,6 +451,7 @@ function TimeGrid({
             key={d.toDateString()}
             day={d}
             hours={hours}
+            availability={availability}
             events={events.filter(
               (e) =>
                 e.startAt.getDate() === d.getDate() &&
@@ -465,23 +474,40 @@ function TimeGrid({
 function DayColumn({
   day,
   hours,
+  availability,
   events,
   onEditEvent,
   onCreateAt,
 }: {
   day: Date
   hours: number[]
+  availability: AvailabilitySlot[]
   events: CalendarEvent[]
   onEditEvent: (id: string) => void
   onCreateAt: (at: Date) => void
 }) {
+  const windows = useMemo(
+    () => activeWindowsForDay(availability, day.getDay()),
+    [availability, day],
+  )
   return (
     <div className="relative">
       {hours.map((h) => (
-        <DayHourCell key={h} day={day} hour={h} onCreateAt={onCreateAt} />
+        <DayHourCell
+          key={h}
+          day={day}
+          hour={h}
+          windows={windows}
+          onCreateAt={onCreateAt}
+        />
       ))}
       {events.map((e) => (
-        <EventBlock key={e.id} event={e} onClick={() => onEditEvent(e.id)} />
+        <EventBlock
+          key={e.id}
+          event={e}
+          windows={windows}
+          onClick={() => onEditEvent(e.id)}
+        />
       ))}
     </div>
   )
@@ -490,23 +516,40 @@ function DayColumn({
 function DayHourCell({
   day,
   hour,
+  windows,
   onCreateAt,
 }: {
   day: Date
   hour: number
+  windows: DayWindow[]
   onCreateAt: (at: Date) => void
 }) {
   const id = `cell:${day.getTime()}:${hour}`
   const { setNodeRef, isOver } = useDroppable({ id })
 
+  const cellStartMin = hour * 60
+  const cellEndMin = cellStartMin + 60
+  const overlap = windows.some(
+    (w) => w.startMin < cellEndMin && w.endMin > cellStartMin,
+  )
+
   return (
     <div
       ref={setNodeRef}
+      aria-label={
+        overlap ? undefined : "Outside your weekly availability"
+      }
       className={cn(
         "border-t border-l border-border",
-        isOver && "bg-muted/40",
+        !overlap && "bg-muted/70",
+        isOver && "bg-muted",
       )}
-      style={{ height: HOUR_HEIGHT }}
+      style={{
+        height: HOUR_HEIGHT,
+        backgroundImage: overlap
+          ? undefined
+          : "repeating-linear-gradient(-45deg, transparent 0, transparent 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 12px)",
+      }}
       onDoubleClick={() => {
         const at = new Date(day)
         at.setHours(hour, 0, 0, 0)
@@ -518,9 +561,11 @@ function DayHourCell({
 
 function EventBlock({
   event,
+  windows,
   onClick,
 }: {
   event: CalendarEvent
+  windows: DayWindow[]
   onClick: () => void
 }) {
   // Cancelled appointments are frozen — no drag-to-reschedule. Clicking still
@@ -543,6 +588,9 @@ function EventBlock({
   const overflowsCell = durationMinutes > 60
 
   const palette = colorFor(event.status, event.type)
+  const outsideAvailability =
+    event.status !== "cancelled" &&
+    !isRangeWithinDayWindows(event.startAt, event.endAt, windows)
 
   return (
     // @dnd-kit's useDraggable injects attrs derived from a module-global
@@ -562,6 +610,7 @@ function EventBlock({
         e.stopPropagation()
         if (!isDragging) onClick()
       }}
+      title={outsideAvailability ? "Outside your weekly availability" : undefined}
       style={{
         top,
         height,
@@ -572,10 +621,20 @@ function EventBlock({
       className={cn(
         "absolute inset-x-0.5 z-10 overflow-hidden rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight shadow-sm transition-colors",
         palette,
+        outsideAvailability &&
+          "border-amber-500/70 dark:border-amber-400/70",
         isDragging && "opacity-70",
       )}
     >
-      <p className="truncate font-medium">{event.title}</p>
+      <p className="flex items-center gap-1 truncate font-medium">
+        {outsideAvailability && (
+          <AlertTriangle
+            aria-hidden
+            className="size-3 shrink-0 text-amber-600 dark:text-amber-400"
+          />
+        )}
+        <span className="truncate">{event.title}</span>
+      </p>
       <p className="truncate opacity-80">
         {overflowsCell
           ? `${fmtTime(event.startAt)}–${fmtTime(event.endAt)}`
@@ -746,6 +805,57 @@ function periodLabel(d: Date, view: View): string {
   }
   return `${MONTH_LABELS_LONG[d.getMonth()]} ${d.getFullYear()}`
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// Availability helpers
+// ─────────────────────────────────────────────────────────────────────────────
+export type DayWindow = { startMin: number; endMin: number }
+
+function timeStringToMinutes(t: string): number {
+  // Handles "HH:MM" or "HH:MM:SS" (postgres `time` serializes with seconds).
+  const [h, m] = t.split(":").map(Number)
+  return (h ?? 0) * 60 + (m ?? 0)
+}
+
+export function activeWindowsForDay(
+  availability: AvailabilitySlot[],
+  dayOfWeek: number,
+): DayWindow[] {
+  return availability
+    .filter((s) => s.isActive && s.dayOfWeek === dayOfWeek)
+    .map((s) => ({
+      startMin: timeStringToMinutes(s.startTime),
+      endMin: timeStringToMinutes(s.endTime),
+    }))
+}
+
+function isRangeWithinDayWindows(
+  start: Date,
+  end: Date,
+  windows: DayWindow[],
+): boolean {
+  if (windows.length === 0) return false
+  const sMin = start.getHours() * 60 + start.getMinutes()
+  const eMin = end.getHours() * 60 + end.getMinutes()
+  // Multi-day appointments are treated as outside availability.
+  if (
+    start.getDate() !== end.getDate() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getFullYear() !== end.getFullYear()
+  ) {
+    return false
+  }
+  return windows.some((w) => w.startMin <= sMin && eMin <= w.endMin)
+}
+
+export function isRangeWithinAvailability(
+  start: Date,
+  end: Date,
+  availability: AvailabilitySlot[],
+): boolean {
+  const windows = activeWindowsForDay(availability, start.getDay())
+  return isRangeWithinDayWindows(start, end, windows)
+}
+
 function colorFor(status: string, type: string): string {
   if (status === "cancelled")
     return "bg-muted/60 text-muted-foreground border-border line-through"

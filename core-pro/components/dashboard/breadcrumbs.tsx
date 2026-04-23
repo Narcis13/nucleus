@@ -7,6 +7,8 @@ import { ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+import { useBreadcrumbOverrides } from "./breadcrumb-context"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // <Breadcrumbs>
 //
@@ -40,7 +42,8 @@ function isOpaqueId(segment: string): boolean {
 
 export function Breadcrumbs({ className }: { className?: string }) {
   const pathname = usePathname() ?? "/dashboard"
-  const crumbs = buildCrumbs(pathname)
+  const overrides = useBreadcrumbOverrides()
+  const crumbs = buildCrumbs(pathname, overrides)
 
   // Only render the component when there's a meaningful trail. On the bare
   // /dashboard route the page's own header already says "Dashboard" — the
@@ -75,7 +78,10 @@ export function Breadcrumbs({ className }: { className?: string }) {
   )
 }
 
-function buildCrumbs(pathname: string): Crumb[] {
+function buildCrumbs(
+  pathname: string,
+  overrides: Record<string, string>,
+): Crumb[] {
   const parts = pathname.split("/").filter(Boolean)
   if (parts.length === 0 || parts[0] !== "dashboard") return []
 
@@ -92,8 +98,14 @@ function buildCrumbs(pathname: string): Crumb[] {
     const segment = parts[i]!
     acc = `${acc}/${segment}`
     const isLast = i === parts.length - 1
+    const override = overrides[segment]
+    const label = override
+      ? override
+      : isOpaqueId(segment)
+        ? segment
+        : titleCase(segment)
     crumbs.push({
-      label: isOpaqueId(segment) ? segment : titleCase(segment),
+      label,
       href: acc,
       isCurrent: isLast,
     })

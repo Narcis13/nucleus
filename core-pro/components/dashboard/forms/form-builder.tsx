@@ -17,17 +17,19 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Eye, GripVertical, PenLine, Save, Send } from "lucide-react"
+import { Eye, GripVertical, PenLine, Save, Send, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAction } from "next-safe-action/hooks"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 
+import { SetBreadcrumbLabel } from "@/components/dashboard/breadcrumb-context"
 import { FormRenderer } from "@/components/shared/forms/form-renderer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  archiveFormAction,
   assignFormAction,
   updateFormAction,
 } from "@/lib/actions/forms"
@@ -94,6 +96,16 @@ export function FormBuilder({
     },
   })
 
+  const archiveAction = useAction(archiveFormAction, {
+    onSuccess: () => {
+      toast.success("Form deleted.")
+      router.push("/dashboard/forms")
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError ?? "Couldn't delete form.")
+    },
+  })
+
   const assignAction = useAction(assignFormAction, {
     onSuccess: ({ data }) => {
       toast.success(
@@ -148,8 +160,19 @@ export function FormBuilder({
     })
   }
 
+  const handleDelete = () => {
+    if (
+      window.confirm(
+        `Delete "${initialTitle || "this form"}"? Existing assignments and responses will be kept but the form will be hidden from the list.`,
+      )
+    ) {
+      archiveAction.execute({ id: formId })
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      <SetBreadcrumbLabel segment={formId} label={initialTitle} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2">
           <Input
@@ -166,6 +189,16 @@ export function FormBuilder({
           />
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDelete}
+            disabled={archiveAction.isExecuting}
+            aria-label="Delete form"
+          >
+            <Trash2 className="size-3.5" />
+            Delete
+          </Button>
           <Button
             variant={mode === "preview" ? "secondary" : "outline"}
             size="sm"

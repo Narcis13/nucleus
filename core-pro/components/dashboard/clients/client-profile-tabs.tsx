@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  ArrowUpRight,
   ClipboardList,
   FileText,
   MessageSquare,
@@ -12,19 +13,23 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useAction } from "next-safe-action/hooks"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
+import { MessageInput } from "@/components/shared/chat/message-input"
+import { MessageThread } from "@/components/shared/chat/message-thread"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { updateClientAction } from "@/lib/actions/clients"
+import { openClientConversationAction } from "@/lib/actions/messages"
 import type { ActivityEntry } from "@/lib/db/queries/clients"
 import type {
   Client,
   Document,
   FormAssignment,
   Invoice,
+  Message,
   ProfessionalClient,
   Tag,
 } from "@/types/domain"
@@ -60,6 +65,7 @@ type Props = {
   documents: Document[]
   forms: FormAssignment[]
   invoices: Invoice[]
+  professionalId: string
 }
 
 export function ClientProfileTabs({
@@ -71,6 +77,7 @@ export function ClientProfileTabs({
   documents,
   forms,
   invoices,
+  professionalId,
 }: Props) {
   return (
     <Tabs defaultValue="overview" className="flex w-full flex-col gap-4">
@@ -171,16 +178,11 @@ export function ClientProfileTabs({
       </TabsContent>
 
       <TabsContent value="messages" className="flex flex-col gap-4">
-        <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          The full chat lives in{" "}
-          <Link
-            href="/dashboard/messages"
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            /dashboard/messages
-          </Link>
-          . Realtime conversation inlined here in SESSION 10.
-        </div>
+        <InlineConversation
+          clientId={client.id}
+          clientName={client.fullName}
+          professionalId={professionalId}
+        />
       </TabsContent>
 
       <TabsContent value="documents" className="flex flex-col gap-4">
@@ -327,6 +329,102 @@ function NotesEditor({
           {action.isExecuting ? "Saving…" : "Save notes"}
         </Button>
       </div>
+    </div>
+  )
+}
+
+// Renders the chat surface in-place inside the client profile. Lazy: the
+// conversation is only created/loaded when the Messages tab is actually
+// viewed (the component mounts when the tab becomes active).
+function InlineConversation({
+  clientId,
+  clientName,
+  professionalId,
+}: {
+  clientId: string
+  clientName: string
+  professionalId: string
+}) {
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [initial, setInitial] = useState<Message[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const { execute } = useAction(openClientConversationAction, {
+    onSuccess: ({ data }) => {
+      if (!data) return
+      setConversationId(data.conversationId)
+      setInitial(
+        data.messages.map((m) => ({
+          id: m.id,
+          conversationId: m.conversationId,
+          senderId: m.senderId,
+          senderRole: m.senderRole,
+          content: m.content,
+          type: m.type,
+          mediaUrl: m.mediaUrl,
+          readAt: m.readAt ? new Date(m.readAt) : null,
+          createdAt: new Date(m.createdAt),
+        })),
+      )
+    },
+    onError: ({ error }) => {
+      const msg = error.serverError ?? "Couldn't open conversation."
+      setLoadError(msg)
+      toast.error(msg)
+    },
+  })
+
+  useEffect(() => {
+    execute({ clientId })
+    // Only on mount / client change — the action itself is idempotent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId])
+
+  if (loadError) {
+    return (
+      <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        {loadError}
+      </div>
+    )
+  }
+
+  if (!conversationId) {
+    return (
+      <div className="flex h-72 items-center justify-center rounded-md border border-border bg-muted/30 text-sm text-muted-foreground">
+        Loading conversation with {clientName}…
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-[min(70dvh,640px)] min-h-96 flex-col overflow-hidden rounded-md border border-border bg-background">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <p className="text-xs text-muted-foreground">
+          Realtime thread with {clientName}
+        </p>
+        <Button
+          variant="ghost"
+          size="xs"
+          render={
+            <Link href={`/dashboard/messages?c=${conversationId}`}>
+              Open in inbox
+              <ArrowUpRight className="size-3" />
+            </Link>
+          }
+        />
+      </div>
+      <div className="flex-1 min-h-0">
+        <MessageThread
+          conversationId={conversationId}
+          initial={initial}
+          currentSenderId={professionalId}
+          otherPartyLabel={clientName}
+        />
+      </div>
+      <MessageInput
+        conversationId={conversationId}
+        owner={{ id: professionalId, role: "professional" }}
+      />
     </div>
   )
 }

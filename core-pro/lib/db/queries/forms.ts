@@ -202,9 +202,13 @@ export async function assignFormToClients(
 // PORTAL (client side) — list and fill
 // ─────────────────────────────────────────────────────────────────────────────
 
-// RLS on `form_assignments` already scopes to the current client's rows; we
-// additionally join the form row so the portal list can render the title and
-// a quick status glance.
+// Restricts the portal queries to assignments where the current user is
+// actually the client (matched via clerk_user_id). RLS allows professionals
+// to also see their own clients' assignments here, so without this filter
+// professionals visiting /portal/forms would see (and fail to submit) their
+// clients' forms.
+const currentClientIdsSql = sql`(select id from public.clients where clerk_user_id = (select auth.jwt() ->> 'sub'))`
+
 export async function getClientAssignments(): Promise<
   Array<{
     assignment: FormAssignment
@@ -226,6 +230,7 @@ export async function getClientAssignments(): Promise<
         formResponses,
         eq(formResponses.assignmentId, formAssignments.id),
       )
+      .where(sql`${formAssignments.clientId} in ${currentClientIdsSql}`)
       .orderBy(desc(formAssignments.createdAt))
 
     return rows.map((r) => ({
@@ -238,8 +243,8 @@ export async function getClientAssignments(): Promise<
   })
 }
 
-// Loads a single assignment + form for the fill page. Uses RLS to ensure the
-// assignment belongs to the current client.
+// Loads a single assignment + form for the fill page. Restricts to the
+// current client (same reason as getClientAssignments above).
 export async function getClientAssignment(
   assignmentId: string,
 ): Promise<
@@ -258,7 +263,12 @@ export async function getClientAssignment(
       })
       .from(formAssignments)
       .innerJoin(forms, eq(forms.id, formAssignments.formId))
-      .where(eq(formAssignments.id, assignmentId))
+      .where(
+        and(
+          eq(formAssignments.id, assignmentId),
+          sql`${formAssignments.clientId} in ${currentClientIdsSql}`,
+        ),
+      )
       .limit(1)
     if (!row) return null
 

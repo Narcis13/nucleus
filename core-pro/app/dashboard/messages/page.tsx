@@ -4,10 +4,12 @@ import { redirect } from "next/navigation"
 import { ConversationList } from "@/components/shared/chat/conversation-list"
 import { MessageInput } from "@/components/shared/chat/message-input"
 import { MessageThread } from "@/components/shared/chat/message-thread"
+import { SimulateClientReply } from "@/components/dashboard/messages/simulate-client-reply"
 import { EmptyState, PageHeader } from "@/components/shared/page-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getConversation, getConversations, getMessages } from "@/lib/db/queries/messages"
 import { getProfessional } from "@/lib/db/queries/professionals"
+import { env } from "@/lib/env"
 import { getInitials } from "@/lib/utils"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,6 +100,12 @@ export default async function MessagesPage({
                     </p>
                   </div>
                 </div>
+                {env.NODE_ENV !== "production" && (
+                  <SimulateClientReply
+                    conversationId={selectedId}
+                    clientName={detail.client.fullName}
+                  />
+                )}
                 <div className="flex-1 min-h-0">
                   <MessageThread
                     conversationId={selectedId}
