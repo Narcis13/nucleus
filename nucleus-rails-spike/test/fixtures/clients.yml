@@ -1,0 +1,2 @@
+# Clients are created by tests explicitly via ActsAsTenant.with_tenant
+# to avoid any chance of the Rails fixture loader bypassing tenancy.

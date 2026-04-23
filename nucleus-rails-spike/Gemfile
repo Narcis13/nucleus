@@ -48,6 +48,9 @@ gem "view_component"
 gem "clerk-sdk-ruby", require: "clerk"
 gem "svix"
 
+# Spike Day 3 — Multi-tenancy (app layer). RLS policy lives in a migration.
+gem "acts_as_tenant"
+
 group :development, :test do
   gem "dotenv-rails"
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

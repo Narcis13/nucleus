@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Spike Day 3 — proves multi-tenancy isolation against the dev Supabase DB.
+#
+# We can't run `rails test` locally (no local Postgres + Supabase extensions in
+# schema.rb would break a local bootstrap anyway). Until that's fixed, this
+# runner exercises the same three assertions the Minitest suite will:
+#
+#   1. acts_as_tenant scopes reads to the current tenant
+#   2. RLS blocks cross-tenant reads even when acts_as_tenant is bypassed
+#   3. RLS blocks all reads when no tenant GUC is set
+#
+# Uses unique clerk_user_ids + an ensure block so the dev DB is left clean.
+
+require_relative "../config/environment"
+require "securerandom"
+
+PASS = "\e[32mPASS\e[0m"
+FAIL = "\e[31mFAIL\e[0m"
+
+def check(label)
+  yield
+  puts "  #{PASS}  #{label}"
+rescue => e
+  puts "  #{FAIL}  #{label}"
+  puts "         #{e.class}: #{e.message}"
+  @failures += 1
+end
+
+@failures = 0
+suffix = SecureRandom.hex(4)
+alice = Professional.create!(clerk_user_id: "spike-verify-alice-#{suffix}", full_name: "Alice Verify")
+bob   = Professional.create!(clerk_user_id: "spike-verify-bob-#{suffix}",   full_name: "Bob Verify")
+
+begin
+  puts "\nMulti-tenancy isolation checks:"
+
+  # 1. acts_as_tenant scopes reads.
+  ActsAsTenant.with_tenant(alice) { Client.create!(full_name: "Alice's client") }
+  ActsAsTenant.with_tenant(bob)   { Client.create!(full_name: "Bob's client") }
+
+  check "acts_as_tenant: alice sees only her clients" do
+    ActsAsTenant.with_tenant(alice) do
+      names = Client.pluck(:full_name)
+      raise "expected [Alice's client], got #{names.inspect}" unless names == [ "Alice's client" ]
+    end
+  end
+
+  check "acts_as_tenant: bob sees only his clients" do
+    ActsAsTenant.with_tenant(bob) do
+      names = Client.pluck(:full_name)
+      raise "expected [Bob's client], got #{names.inspect}" unless names == [ "Bob's client" ]
+    end
+  end
+
+  # 2. RLS blocks cross-tenant reads when acts_as_tenant is bypassed.
+  check "RLS: with alice's GUC, only alice's rows are visible without acts_as_tenant" do
+    ApplicationRecord.with_tenant_setting(alice.id) do
+      visible = ActsAsTenant.without_tenant { Client.unscoped.pluck(:full_name) }
+      raise "expected [Alice's client], got #{visible.inspect}" unless visible == [ "Alice's client" ]
+    end
+  end
+
+  check "RLS: with bob's GUC, only bob's rows are visible without acts_as_tenant" do
+    ApplicationRecord.with_tenant_setting(bob.id) do
+      visible = ActsAsTenant.without_tenant { Client.unscoped.pluck(:full_name) }
+      raise "expected [Bob's client], got #{visible.inspect}" unless visible == [ "Bob's client" ]
+    end
+  end
+
+  # 3. RLS fails closed when no GUC is set but the app role is active.
+  #    Must SET LOCAL ROLE authenticated here too — otherwise we run as
+  #    postgres (BYPASSRLS) and the policy is silently ignored.
+  check "RLS: authenticated role + no GUC -> zero rows visible" do
+    Client.transaction do
+      ActiveRecord::Base.connection.execute("SET LOCAL ROLE authenticated")
+      rows = ActsAsTenant.without_tenant { Client.unscoped.count }
+      raise "expected 0 rows, got #{rows}" unless rows.zero?
+    end
+  end
+
+  # 4. WITH CHECK: insert with wrong GUC is rejected.
+  check "RLS: WITH CHECK rejects inserts that violate the policy" do
+    rejected = false
+    begin
+      ApplicationRecord.with_tenant_setting(alice.id) do
+        ActsAsTenant.without_tenant do
+          Client.create!(professional: bob, full_name: "Forbidden")
+        end
+      end
+    rescue ActiveRecord::StatementInvalid => e
+      rejected = e.message.include?("row-level security") || e.message.include?("violates row-level security")
+    end
+    raise "expected insert to be blocked by RLS WITH CHECK" unless rejected
+  end
+ensure
+  # Cleanup — need tenant scope disabled AND GUC set to each owner to delete.
+  ActsAsTenant.without_tenant do
+    [ alice, bob ].each do |prof|
+      ApplicationRecord.with_tenant_setting(prof.id) do
+        Client.unscoped.where(professional_id: prof.id).delete_all
+      end
+      prof.destroy
+    end
+  end
+end
+
+puts ""
+if @failures.zero?
+  puts "\e[32mAll checks passed.\e[0m"
+  exit 0
+else
+  puts "\e[31m#{@failures} check(s) failed.\e[0m"
+  exit 1
+end

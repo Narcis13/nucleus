@@ -1,0 +1,25 @@
+<% content_for :title, "Clients" %>
+
+<div class="max-w-3xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold">Clients</h1>
+    <%= link_to "New client", new_client_path, class: "rounded bg-gray-900 text-white px-3 py-1.5 text-sm" %>
+  </div>
+
+  <% if notice %>
+    <p class="mb-4 text-green-700"><%= notice %></p>
+  <% end %>
+
+  <% if @clients.any? %>
+    <ul class="divide-y rounded border">
+      <% @clients.each do |client| %>
+        <li class="p-3 flex justify-between">
+          <%= link_to client.full_name, client_path(client), class: "text-blue-600" %>
+          <span class="text-sm text-gray-500"><%= client.email %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="text-gray-500">No clients yet.</p>
+  <% end %>
+</div>
