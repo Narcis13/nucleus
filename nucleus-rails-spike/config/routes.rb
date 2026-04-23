@@ -1,6 +1,9 @@
 Rails.application.routes.draw do
   resources :notes
   resources :clients, only: [ :index, :new, :create, :show ]
+  resources :conversations, only: [ :index, :show, :create ] do
+    resources :messages, only: [ :create ]
+  end
 
   get "sign-in", to: "sessions#new", as: :sign_in
   get "dashboard", to: "dashboard#index", as: :dashboard

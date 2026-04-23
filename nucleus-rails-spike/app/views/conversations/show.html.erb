@@ -1,0 +1,21 @@
+<% content_for :title, "Chat with #{@conversation.client.full_name}" %>
+
+<div class="max-w-2xl mx-auto p-6 w-full flex flex-col h-[80vh]">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <%= link_to "< Conversations", conversations_path, class: "text-sm text-gray-500" %>
+      <h1 class="text-2xl font-semibold"><%= @conversation.client.full_name %></h1>
+    </div>
+  </div>
+
+  <%# turbo_stream_from subscribes this browser to a signed stream name
+      derived from the conversation record. The Message model's
+      after_create_commit broadcast_append_to pushes new rows here. %>
+  <%= turbo_stream_from @conversation %>
+
+  <div id="messages" class="flex-1 overflow-y-auto border rounded p-3 bg-gray-50 space-y-2">
+    <%= render @messages %>
+  </div>
+
+  <%= render "messages/form", conversation: @conversation, message: @message %>
+</div>

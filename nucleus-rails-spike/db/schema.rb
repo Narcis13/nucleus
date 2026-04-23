@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_23_081721) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_23_085709) do
   create_schema "extensions"
 
   # These are extensions that must be enabled in order to support this database
@@ -31,6 +31,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_081721) do
     t.index ["professional_id"], name: "index_clients_on_professional_id"
   end
 
+  create_table "public.conversations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "client_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "professional_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_id"], name: "index_conversations_on_client_id"
+    t.index ["professional_id", "client_id"], name: "index_conversations_on_professional_id_and_client_id", unique: true
+    t.index ["professional_id"], name: "index_conversations_on_professional_id"
+  end
+
+  create_table "public.messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "body", null: false
+    t.uuid "conversation_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "professional_id", null: false
+    t.string "sender_clerk_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conversation_id", "created_at"], name: "index_messages_on_conversation_id_and_created_at"
+    t.index ["conversation_id"], name: "index_messages_on_conversation_id"
+    t.index ["professional_id"], name: "index_messages_on_professional_id"
+  end
+
   create_table "public.notes", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
@@ -47,6 +69,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_081721) do
     t.index ["clerk_user_id"], name: "index_professionals_on_clerk_user_id", unique: true
   end
 
+  create_table "public.solid_cable_messages", force: :cascade do |t|
+    t.binary "channel", null: false
+    t.bigint "channel_hash", null: false
+    t.datetime "created_at", null: false
+    t.binary "payload", null: false
+    t.index ["channel"], name: "index_solid_cable_messages_on_channel"
+    t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
+    t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
+  end
+
   add_foreign_key "public.clients", "public.professionals"
+  add_foreign_key "public.conversations", "public.clients"
+  add_foreign_key "public.conversations", "public.professionals"
+  add_foreign_key "public.messages", "public.conversations"
+  add_foreign_key "public.messages", "public.professionals"
 
 end

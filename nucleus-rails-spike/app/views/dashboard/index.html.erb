@@ -8,6 +8,11 @@
     <dt class="font-medium">Email</dt><dd><%= current_professional.email %></dd>
   </dl>
 
+  <nav class="flex gap-3 mb-6 text-sm">
+    <%= link_to "Clients", clients_path, class: "text-blue-600 hover:underline" %>
+    <%= link_to "Conversations", conversations_path, class: "text-blue-600 hover:underline" %>
+  </nav>
+
   <div id="clerk-user-button" class="mb-4"></div>
 
   <script async crossorigin="anonymous"
