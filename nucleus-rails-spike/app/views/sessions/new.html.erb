@@ -1,0 +1,16 @@
+<div class="max-w-md mx-auto py-16 px-6">
+  <h1 class="text-2xl font-bold mb-6">Sign in</h1>
+  <div id="clerk-sign-in"></div>
+
+  <script async crossorigin="anonymous"
+          data-clerk-publishable-key="<%= ENV['CLERK_PUBLISHABLE_KEY'] %>"
+          src="<%= clerk_js_url %>"
+          type="text/javascript"></script>
+  <script>
+    window.addEventListener("load", async () => {
+      await Clerk.load();
+      const el = document.getElementById("clerk-sign-in");
+      if (el) Clerk.mountSignIn(el, { afterSignInUrl: "/dashboard", afterSignUpUrl: "/dashboard" });
+    });
+  </script>
+</div>

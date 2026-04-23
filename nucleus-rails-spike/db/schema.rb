@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_23_072707) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_23_074826) do
   create_schema "extensions"
 
   # These are extensions that must be enabled in order to support this database
@@ -26,6 +26,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_072707) do
     t.datetime "created_at", null: false
     t.string "title"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "public.professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "clerk_user_id", null: false
+    t.datetime "created_at", null: false
+    t.string "email"
+    t.string "full_name"
+    t.datetime "updated_at", null: false
+    t.index ["clerk_user_id"], name: "index_professionals_on_clerk_user_id", unique: true
   end
 
 end

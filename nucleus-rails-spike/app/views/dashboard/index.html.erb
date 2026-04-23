@@ -1,0 +1,24 @@
+<div class="max-w-2xl mx-auto py-16 px-6">
+  <h1 class="text-3xl font-bold mb-4">
+    Hello, <%= current_professional.full_name.presence || current_professional.email %>
+  </h1>
+  <dl class="text-sm text-gray-700 grid grid-cols-[auto,1fr] gap-x-4 gap-y-1 mb-8">
+    <dt class="font-medium">Professional ID</dt><dd><code><%= current_professional.id %></code></dd>
+    <dt class="font-medium">Clerk user ID</dt><dd><code><%= current_professional.clerk_user_id %></code></dd>
+    <dt class="font-medium">Email</dt><dd><%= current_professional.email %></dd>
+  </dl>
+
+  <div id="clerk-user-button" class="mb-4"></div>
+
+  <script async crossorigin="anonymous"
+          data-clerk-publishable-key="<%= ENV['CLERK_PUBLISHABLE_KEY'] %>"
+          src="<%= clerk_js_url %>"
+          type="text/javascript"></script>
+  <script>
+    window.addEventListener("load", async () => {
+      await Clerk.load();
+      const el = document.getElementById("clerk-user-button");
+      if (el) Clerk.mountUserButton(el, { afterSignOutUrl: "/sign-in" });
+    });
+  </script>
+</div>
