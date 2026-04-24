@@ -1,0 +1,7 @@
+<% if flash.any? %>
+  <div id="flash" class="container mx-auto px-5 pt-4 space-y-2">
+    <% flash.each do |type, msg| %>
+      <div class="flash flash-<%= type %>" role="status"><%= msg %></div>
+    <% end %>
+  </div>
+<% end %>

@@ -12,7 +12,6 @@
 
 ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
   # These are extensions that must be enabled in order to support this database
-  enable_extension "extensions.pg_net"
   enable_extension "extensions.pg_stat_statements"
   enable_extension "extensions.pgcrypto"
   enable_extension "extensions.uuid-ossp"
@@ -80,6 +79,45 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
     t.index ["organization_id"], name: "index_audit_logs_on_organization_id"
   end
 
+  create_table "clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "email"
+    t.string "full_name"
+    t.string "phone"
+    t.uuid "professional_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["professional_id"], name: "index_clients_on_professional_id"
+  end
+
+  create_table "conversations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "client_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "professional_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_id"], name: "index_conversations_on_client_id"
+    t.index ["professional_id", "client_id"], name: "index_conversations_on_professional_id_and_client_id", unique: true
+    t.index ["professional_id"], name: "index_conversations_on_professional_id"
+  end
+
+  create_table "messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "body", null: false
+    t.uuid "conversation_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "professional_id", null: false
+    t.string "sender_clerk_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conversation_id", "created_at"], name: "index_messages_on_conversation_id_and_created_at"
+    t.index ["conversation_id"], name: "index_messages_on_conversation_id"
+    t.index ["professional_id"], name: "index_messages_on_professional_id"
+  end
+
+  create_table "notes", force: :cascade do |t|
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.string "title"
+    t.datetime "updated_at", null: false
+  end
+
   create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "organization_id", null: false
@@ -101,6 +139,105 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
     t.index ["slug"], name: "index_organizations_on_slug", unique: true, where: "(slug IS NOT NULL)"
   end
 
+  create_table "pay_charges", force: :cascade do |t|
+    t.integer "amount", null: false
+    t.integer "amount_refunded"
+    t.integer "application_fee_amount"
+    t.datetime "created_at", null: false
+    t.string "currency"
+    t.bigint "customer_id", null: false
+    t.jsonb "data"
+    t.jsonb "metadata"
+    t.jsonb "object"
+    t.string "processor_id", null: false
+    t.string "stripe_account"
+    t.bigint "subscription_id"
+    t.string "type"
+    t.datetime "updated_at", null: false
+    t.index ["customer_id", "processor_id"], name: "index_pay_charges_on_customer_id_and_processor_id", unique: true
+    t.index ["subscription_id"], name: "index_pay_charges_on_subscription_id"
+  end
+
+  create_table "pay_customers", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "data"
+    t.boolean "default"
+    t.datetime "deleted_at", precision: nil
+    t.jsonb "object"
+    t.bigint "owner_id"
+    t.string "owner_type"
+    t.string "processor", null: false
+    t.string "processor_id"
+    t.string "stripe_account"
+    t.string "type"
+    t.datetime "updated_at", null: false
+    t.index ["owner_type", "owner_id", "deleted_at"], name: "pay_customer_owner_index", unique: true
+    t.index ["processor", "processor_id"], name: "index_pay_customers_on_processor_and_processor_id", unique: true
+  end
+
+  create_table "pay_merchants", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "data"
+    t.boolean "default"
+    t.bigint "owner_id"
+    t.string "owner_type"
+    t.string "processor", null: false
+    t.string "processor_id"
+    t.string "type"
+    t.datetime "updated_at", null: false
+    t.index ["owner_type", "owner_id", "processor"], name: "index_pay_merchants_on_owner_type_and_owner_id_and_processor"
+  end
+
+  create_table "pay_payment_methods", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "customer_id", null: false
+    t.jsonb "data"
+    t.boolean "default"
+    t.string "payment_method_type"
+    t.string "processor_id", null: false
+    t.string "stripe_account"
+    t.string "type"
+    t.datetime "updated_at", null: false
+    t.index ["customer_id", "processor_id"], name: "index_pay_payment_methods_on_customer_id_and_processor_id", unique: true
+  end
+
+  create_table "pay_subscriptions", force: :cascade do |t|
+    t.decimal "application_fee_percent", precision: 8, scale: 2
+    t.datetime "created_at", null: false
+    t.datetime "current_period_end", precision: nil
+    t.datetime "current_period_start", precision: nil
+    t.bigint "customer_id", null: false
+    t.jsonb "data"
+    t.datetime "ends_at", precision: nil
+    t.jsonb "metadata"
+    t.boolean "metered"
+    t.string "name", null: false
+    t.jsonb "object"
+    t.string "pause_behavior"
+    t.datetime "pause_resumes_at", precision: nil
+    t.datetime "pause_starts_at", precision: nil
+    t.string "payment_method_id"
+    t.string "processor_id", null: false
+    t.string "processor_plan", null: false
+    t.integer "quantity", default: 1, null: false
+    t.string "status", null: false
+    t.string "stripe_account"
+    t.datetime "trial_ends_at", precision: nil
+    t.string "type"
+    t.datetime "updated_at", null: false
+    t.index ["customer_id", "processor_id"], name: "index_pay_subscriptions_on_customer_id_and_processor_id", unique: true
+    t.index ["metered"], name: "index_pay_subscriptions_on_metered"
+    t.index ["pause_starts_at"], name: "index_pay_subscriptions_on_pause_starts_at"
+  end
+
+  create_table "pay_webhooks", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "event"
+    t.string "event_type"
+    t.string "processor"
+    t.datetime "updated_at", null: false
+  end
+
   create_table "professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "clerk_org_id"
     t.string "clerk_user_id", null: false
@@ -111,6 +248,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
     t.datetime "updated_at", null: false
     t.index ["clerk_org_id"], name: "index_professionals_on_clerk_org_id"
     t.index ["clerk_user_id"], name: "index_professionals_on_clerk_user_id", unique: true
+  end
+
+  create_table "solid_cable_messages", force: :cascade do |t|
+    t.binary "channel", null: false
+    t.bigint "channel_hash", null: false
+    t.datetime "created_at", null: false
+    t.binary "payload", null: false
+    t.index ["channel"], name: "index_solid_cable_messages_on_channel"
+    t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
+    t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
   end
 
   create_table "solid_cache_entries", force: :cascade do |t|
@@ -246,8 +393,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
   end
 
   add_foreign_key "audit_logs", "organizations", on_delete: :cascade
+  add_foreign_key "clients", "professionals"
+  add_foreign_key "conversations", "clients"
+  add_foreign_key "conversations", "professionals"
+  add_foreign_key "messages", "conversations"
+  add_foreign_key "messages", "professionals"
   add_foreign_key "organization_memberships", "organizations", on_delete: :cascade
   add_foreign_key "organization_memberships", "professionals", on_delete: :cascade
+  add_foreign_key "pay_charges", "pay_customers", column: "customer_id"
+  add_foreign_key "pay_charges", "pay_subscriptions", column: "subscription_id"
+  add_foreign_key "pay_payment_methods", "pay_customers", column: "customer_id"
+  add_foreign_key "pay_subscriptions", "pay_customers", column: "customer_id"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

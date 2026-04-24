@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+# Dev server without the Tailwind --watch process.
+# Use on Intel macOS hosts where FSEvents stalls the watcher.
+#
+# Does a one-shot Tailwind build up front and then boots Rails.
+# When you change a Tailwind class in a view/component, run `bin/css`
+# in another terminal (or re-run this script) to rebuild.
+
+set -e
+
+export PORT="${PORT:-3000}"
+export RUBY_DEBUG_OPEN="true"
+export RUBY_DEBUG_LAZY="true"
+
+echo "==> Building Tailwind (one-shot)"
+bin/rails tailwindcss:build
+
+echo "==> Starting Rails on :$PORT (no watcher)"
+exec bin/rails server -p "$PORT"

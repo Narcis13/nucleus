@@ -1,0 +1,28 @@
+<dialog id="<%= id %>"
+        data-controller="modal"
+        data-modal-open-value="<%= open %>"
+        class="<%= dialog_classes %>">
+  <div class="flex items-center justify-between px-5 py-3 border-b border-border">
+    <% if header? %>
+      <%= header %>
+    <% else %>
+      <h3 class="font-medium text-sm"><%= title %></h3>
+    <% end %>
+    <button type="button"
+            data-action="modal#close"
+            class="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-surface-2"
+            aria-label="Close">
+      ×
+    </button>
+  </div>
+
+  <div class="p-5">
+    <%= content %>
+  </div>
+
+  <% if footer? %>
+    <div class="px-5 py-3 border-t border-border bg-surface-2 rounded-b-lg">
+      <%= footer %>
+    </div>
+  <% end %>
+</dialog>

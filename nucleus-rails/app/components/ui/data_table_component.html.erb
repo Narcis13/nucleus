@@ -1,0 +1,47 @@
+<%= tag.div class: wrapper_classes, id: id do %>
+  <% if bulk_actions? %>
+    <div class="flex items-center justify-between gap-3 px-4 py-2 border-b border-border bg-surface-2 text-sm">
+      <%= bulk_actions %>
+    </div>
+  <% end %>
+
+  <% if empty_state? %>
+    <div class="p-6">
+      <% if empty? %>
+        <%= empty %>
+      <% else %>
+        <%= render Ui::EmptyStateComponent.new(title: "No records", description: "Nothing to show yet.") %>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-surface-2 text-left text-xs uppercase tracking-wide text-fg-muted">
+          <tr>
+            <% columns.each do |col| %>
+              <th scope="col" class="px-4 py-2 font-medium">
+                <%= sort_link_for(col) %>
+              </th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <% rows.each do |row| %>
+            <tr class="hover:bg-surface-2/60">
+              <% columns.each do |col| %>
+                <td class="px-4 py-2 align-middle"><%= col.resolve(row, helpers) %></td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if pagy && pagy.pages > 1 %>
+      <div class="flex items-center justify-between gap-3 px-4 py-2 border-t border-border text-sm text-fg-muted">
+        <span><%= helpers.pagy_info(pagy) %></span>
+        <span class="pagy"><%== helpers.pagy_nav(pagy) %></span>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

@@ -1,1 +1,100 @@
 @import "tailwindcss";
+
+/* Dark-mode class variant (selector strategy).
+   <html class="dark"> flips tokens below. Toggled by dark-mode Stimulus
+   controller (app/javascript/controllers/dark_mode_controller.js). */
+@variant dark (&:where(.dark, .dark *));
+
+/* Scan ViewComponent templates so their Tailwind classes ship to the build. */
+@source "../../components/**/*.{rb,erb,html}";
+@source "../../views/**/*.{erb,html}";
+
+/* Design tokens. Light defaults on :root, dark overrides on .dark.
+   Keep this palette small — additions require a UX review. */
+:root {
+  /* Surfaces */
+  --color-bg:           oklch(0.99 0 0);
+  --color-surface:      oklch(1 0 0);
+  --color-surface-2:    oklch(0.97 0 0);
+  --color-border:       oklch(0.91 0 0);
+  --color-ring:         oklch(0.70 0.15 250);
+
+  /* Text */
+  --color-fg:           oklch(0.20 0.02 260);
+  --color-fg-muted:     oklch(0.52 0.02 260);
+  --color-fg-inverse:   oklch(0.98 0 0);
+
+  /* Brand + semantic */
+  --color-primary:      oklch(0.55 0.18 260);
+  --color-primary-fg:   oklch(0.99 0 0);
+  --color-success:      oklch(0.64 0.16 150);
+  --color-warning:      oklch(0.76 0.16 80);
+  --color-danger:       oklch(0.58 0.21 25);
+  --color-info:         oklch(0.66 0.14 240);
+
+  /* Radii + shadows */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.07);
+}
+
+.dark {
+  --color-bg:         oklch(0.17 0.02 260);
+  --color-surface:    oklch(0.21 0.02 260);
+  --color-surface-2:  oklch(0.25 0.02 260);
+  --color-border:     oklch(0.30 0.02 260);
+  --color-ring:       oklch(0.75 0.15 250);
+
+  --color-fg:         oklch(0.97 0 0);
+  --color-fg-muted:   oklch(0.72 0.02 260);
+  --color-fg-inverse: oklch(0.18 0.02 260);
+
+  --color-primary:    oklch(0.72 0.16 260);
+  --color-primary-fg: oklch(0.17 0.02 260);
+  --color-success:    oklch(0.75 0.16 150);
+  --color-warning:    oklch(0.83 0.16 80);
+  --color-danger:     oklch(0.70 0.21 25);
+  --color-info:       oklch(0.76 0.14 240);
+}
+
+/* Expose tokens as Tailwind utilities (bg-surface, text-fg, etc.). */
+@theme inline {
+  --color-bg:           var(--color-bg);
+  --color-surface:      var(--color-surface);
+  --color-surface-2:    var(--color-surface-2);
+  --color-border:       var(--color-border);
+  --color-ring:         var(--color-ring);
+
+  --color-fg:           var(--color-fg);
+  --color-fg-muted:     var(--color-fg-muted);
+  --color-fg-inverse:   var(--color-fg-inverse);
+
+  --color-primary:      var(--color-primary);
+  --color-primary-fg:   var(--color-primary-fg);
+  --color-success:      var(--color-success);
+  --color-warning:      var(--color-warning);
+  --color-danger:       var(--color-danger);
+  --color-info:         var(--color-info);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+/* App-level element defaults. */
+html { background: var(--color-bg); color: var(--color-fg); }
+body { min-height: 100dvh; }
+
+/* Transition tokens on theme flip so the switch feels instant but soft. */
+:where(html, body, [data-theme-transition]) {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Flash helpers — used by the global flash banner in layouts. */
+.flash { @apply rounded-md px-4 py-2 text-sm border; }
+.flash-notice  { @apply bg-info/10 text-info border-info/30; }
+.flash-success { @apply bg-success/10 text-success border-success/30; }
+.flash-alert, .flash-error {
+  @apply bg-danger/10 text-danger border-danger/30;
+}

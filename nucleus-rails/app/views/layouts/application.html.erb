@@ -1,37 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-controller="dark-mode" data-dark-mode-storage-key-value="nucleus.theme">
   <head>
-    <title><%= content_for(:title) || "Nucleus Rails" %></title>
+    <title><%= content_for(:title) || "Nucleus" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Nucleus Rails">
+    <meta name="application-name" content="Nucleus">
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
-    <%= yield :head %>
+    <%# Avoid a light-mode flash by applying the stored theme before CSS paints. %>
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem("nucleus.theme");
+          if (t === "dark" || (t === null && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (_) {}
+      })();
+    </script>
 
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+    <%= yield :head %>
 
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <header class="container mx-auto mt-4 px-5 flex justify-between items-center">
-      <%= link_to "Nucleus", root_path, class: "font-semibold" %>
-      <%= render "shared/clerk_islands" %>
+  <body class="bg-bg text-fg antialiased">
+    <header class="border-b border-border bg-surface">
+      <div class="container mx-auto px-5 py-3 flex justify-between items-center">
+        <%= link_to "Nucleus", root_path, class: "font-semibold text-lg" %>
+        <div class="flex items-center gap-3">
+          <button type="button"
+                  data-action="dark-mode#toggle"
+                  class="inline-flex items-center justify-center h-9 w-9 rounded-md border border-border hover:bg-surface-2"
+                  aria-label="Toggle theme">
+            <span class="hidden dark:inline" aria-hidden="true">☀️</span>
+            <span class="inline dark:hidden" aria-hidden="true">🌙</span>
+          </button>
+          <%= render "shared/clerk_islands" %>
+        </div>
+      </div>
     </header>
-    <main class="container mx-auto mt-8 px-5 flex">
-      <% flash.each do |type, msg| %>
-        <div class="flash flash-<%= type %>"><%= msg %></div>
-      <% end %>
+
+    <%= render "shared/flash" %>
+
+    <main class="container mx-auto px-5 py-8">
       <%= yield %>
     </main>
   </body>

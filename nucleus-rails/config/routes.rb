@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  # ViewComponent development UI. Dev-only — the lookbook gem itself is in
+  # the :development bundle group, so this constant is absent in prod/test.
+  mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
+
   get "sign-in", to: "sessions#new", as: :sign_in
   delete "sign-out", to: "sessions#destroy", as: :sign_out
 

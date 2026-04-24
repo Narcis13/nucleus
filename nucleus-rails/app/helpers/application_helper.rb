@@ -1,6 +1,8 @@
 require "base64"
 
 module ApplicationHelper
+  include Pagy::Frontend
+
   # Clerk publishable keys encode the frontend API host.
   # pk_test_Z2VuZXJvdXMtZmFsY29uLTI2LmNsZXJrLmFjY291bnRzLmRldiQ
   #   → base64("generous-falcon-26.clerk.accounts.dev$")

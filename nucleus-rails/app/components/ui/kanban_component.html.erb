@@ -1,0 +1,28 @@
+<div class="flex gap-4 overflow-x-auto pb-2"
+     data-controller="kanban"
+     data-kanban-update-url-value="<%= update_url %>">
+  <% columns.each do |col| %>
+    <section class="flex w-72 shrink-0 flex-col rounded-lg border border-border bg-surface">
+      <header class="flex items-center justify-between px-3 py-2 border-b border-border">
+        <h3 class="text-sm font-medium"><%= col[:name] %></h3>
+        <span class="text-xs text-fg-muted"><%= Array(col[:items]).size %></span>
+      </header>
+
+      <ul class="flex-1 p-2 space-y-2 min-h-12"
+          data-kanban-target="column"
+          data-column-id="<%= col[:id] %>">
+        <% Array(col[:items]).each do |item| %>
+          <li class="rounded-md border border-border bg-surface-2 p-3 text-sm cursor-grab active:cursor-grabbing"
+              data-kanban-target="item"
+              data-item-id="<%= item.respond_to?(:id) ? item.id : item[:id] %>">
+            <% if item_partial %>
+              <%= render partial: item_partial, locals: { item_locals_key => item } %>
+            <% else %>
+              <%= item.respond_to?(:to_s) ? item.to_s : item.inspect %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+</div>

@@ -1,0 +1,28 @@
+<%# Public micro-site shell. No auth, no chrome — the professional's
+    marketing page. Brand styles come from @brand_style like the portal. %>
+<!DOCTYPE html>
+<html lang="en"
+  <% if (brand = content_for?(:brand_style).presence) %>style="<%= brand %>"<% end %>>
+  <head>
+    <title><%= content_for(:title) || "Nucleus" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%# SEO: pages supply these via content_for. %>
+    <% if content_for?(:meta_description) %>
+      <meta name="description" content="<%= strip_tags(content_for(:meta_description)) %>">
+    <% end %>
+    <% if content_for?(:og_image) %>
+      <meta property="og:image" content="<%= content_for(:og_image) %>">
+    <% end %>
+
+    <%= yield :head %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="bg-bg text-fg antialiased">
+    <%= yield %>
+  </body>
+</html>
