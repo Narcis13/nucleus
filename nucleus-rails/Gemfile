@@ -85,6 +85,15 @@ gem "ahoy_matey"
 # Rate limiting
 gem "rack-attack"
 
+# --- Rs4.5 additions --------------------------------------------------------
+# JSON serialization for the /api/v1 layer. Faster + simpler than Jbuilder;
+# resource classes live in app/resources/.
+gem "alba"
+
+# PAT hashing. Tokens are stored as a bcrypt digest; the plaintext is shown
+# to the user exactly once at issue time.
+gem "bcrypt", "~> 3.1"
+
 # Security
 gem "rack-cors"
 gem "secure_headers"

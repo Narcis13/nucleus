@@ -84,11 +84,13 @@ GEM
       cgi
       device_detector (>= 1)
       safely_block (>= 0.4)
+    alba (3.10.0)
     annotaterb (4.22.0)
       activerecord (>= 6.0.0)
       activesupport (>= 6.0.0)
     ast (2.4.3)
     base64 (0.3.0)
+    bcrypt (3.1.22)
     bcrypt_pbkdf (1.1.2)
     bigdecimal (3.3.1)
     bindex (0.8.1)
@@ -616,7 +618,9 @@ PLATFORMS
 DEPENDENCIES
   acts_as_tenant
   ahoy_matey
+  alba
   annotaterb
+  bcrypt (~> 3.1)
   bootsnap
   brakeman
   bullet

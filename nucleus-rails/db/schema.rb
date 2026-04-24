@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "extensions.pg_stat_statements"
   enable_extension "extensions.pgcrypto"
@@ -238,6 +238,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "personal_access_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.datetime "last_used_at"
+    t.string "name", null: false
+    t.uuid "organization_id", null: false
+    t.uuid "professional_id", null: false
+    t.datetime "revoked_at"
+    t.jsonb "scopes", default: [], null: false
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "revoked_at"], name: "idx_personal_access_tokens_on_org_and_revoked"
+    t.index ["organization_id"], name: "index_personal_access_tokens_on_organization_id"
+    t.index ["professional_id"], name: "index_personal_access_tokens_on_professional_id"
+  end
+
   create_table "professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "clerk_org_id"
     t.string "clerk_user_id", null: false
@@ -404,6 +420,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
   add_foreign_key "pay_charges", "pay_subscriptions", column: "subscription_id"
   add_foreign_key "pay_payment_methods", "pay_customers", column: "customer_id"
   add_foreign_key "pay_subscriptions", "pay_customers", column: "customer_id"
+  add_foreign_key "personal_access_tokens", "organizations", on_delete: :cascade
+  add_foreign_key "personal_access_tokens", "professionals", on_delete: :cascade
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
