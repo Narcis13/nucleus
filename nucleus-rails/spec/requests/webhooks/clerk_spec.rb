@@ -71,7 +71,6 @@ RSpec.describe "Webhooks::Clerk", type: :request do
       pro = Professional.find_by(clerk_user_id: "user_abc")
       expect(pro.email).to eq("ada@example.com")
       expect(pro.full_name).to eq("Ada Lovelace")
-      expect(pro.role).to eq("owner")
     end
   end
 
@@ -84,28 +83,66 @@ RSpec.describe "Webhooks::Clerk", type: :request do
     end
   end
 
-  describe "organizationMembership.created" do
-    it "sets clerk_org_id and role on the existing Professional" do
-      pro = create(:professional, clerk_user_id: "user_abc", role: "owner")
-
-      post_event({
-        type: "organizationMembership.created",
-        data: {
-          role: "org:member",
-          organization: { id: "org_123" },
-          public_user_data: { user_id: "user_abc" }
-        }
-      })
+  describe "organization.created" do
+    it "creates an Organization row" do
+      expect {
+        post_event({
+          type: "organization.created",
+          data: { id: "org_123", name: "Acme", slug: "acme" }
+        })
+      }.to change(Organization, :count).by(1)
 
       expect(response).to have_http_status(:ok)
-      pro.reload
-      expect(pro.clerk_org_id).to eq("org_123")
-      expect(pro.role).to eq("member")
+      org = Organization.find_by(clerk_org_id: "org_123")
+      expect(org.name).to eq("Acme")
+      expect(org.slug).to eq("acme")
+    end
+  end
+
+  describe "organization.updated" do
+    it "updates an existing Organization row" do
+      create(:organization, clerk_org_id: "org_123", name: "Old")
+      post_event({ type: "organization.updated", data: { id: "org_123", name: "New" } })
+      expect(Organization.find_by(clerk_org_id: "org_123").name).to eq("New")
+    end
+  end
+
+  describe "organization.deleted" do
+    it "destroys the Organization row" do
+      create(:organization, clerk_org_id: "org_123")
+      expect {
+        post_event({ type: "organization.deleted", data: { id: "org_123" } })
+      }.to change(Organization, :count).by(-1)
+    end
+  end
+
+  describe "organizationMembership.created" do
+    it "creates an OrganizationMembership and upserts the Organization" do
+      pro = create(:professional, clerk_user_id: "user_abc")
+
+      expect {
+        post_event({
+          type: "organizationMembership.created",
+          data: {
+            role: "org:member",
+            organization: { id: "org_123", name: "Acme" },
+            public_user_data: { user_id: "user_abc" }
+          }
+        })
+      }.to change(OrganizationMembership, :count).by(1)
+       .and change(Organization, :count).by(1)
+
+      expect(response).to have_http_status(:ok)
+      org = Organization.find_by(clerk_org_id: "org_123")
+      membership = OrganizationMembership.find_by(professional_id: pro.id, organization_id: org.id)
+      expect(membership.role).to eq("member")
+      # Rs2 back-compat denormalization
+      expect(pro.reload.clerk_org_id).to eq("org_123")
+      expect(pro.reload.role).to eq("member")
     end
 
     it "maps org:admin to owner" do
-      pro = create(:professional, clerk_user_id: "user_abc", role: "member")
-
+      pro = create(:professional, clerk_user_id: "user_abc")
       post_event({
         type: "organizationMembership.created",
         data: {
@@ -114,30 +151,48 @@ RSpec.describe "Webhooks::Clerk", type: :request do
           public_user_data: { user_id: "user_abc" }
         }
       })
-
-      expect(pro.reload.role).to eq("owner")
+      org = Organization.find_by(clerk_org_id: "org_123")
+      expect(OrganizationMembership.find_by(professional_id: pro.id, organization_id: org.id).role).to eq("owner")
     end
   end
 
   describe "organizationMembership.deleted" do
-    it "clears clerk_org_id on the Professional" do
+    it "destroys the matching membership and clears Professional.clerk_org_id" do
       pro = create(:professional, clerk_user_id: "user_abc", clerk_org_id: "org_123")
+      org = create(:organization, clerk_org_id: "org_123")
+      create(:organization_membership, professional: pro, organization: org)
 
-      post_event({
-        type: "organizationMembership.deleted",
-        data: { public_user_data: { user_id: "user_abc" } }
-      })
+      expect {
+        post_event({
+          type: "organizationMembership.deleted",
+          data: {
+            organization: { id: "org_123" },
+            public_user_data: { user_id: "user_abc" }
+          }
+        })
+      }.to change(OrganizationMembership, :count).by(-1)
 
       expect(pro.reload.clerk_org_id).to be_nil
     end
-  end
 
-  describe "organization.created" do
-    it "returns 200 and does not create records (Rs3 introduces the Organization model)" do
-      expect {
-        post_event({ type: "organization.created", data: { id: "org_123", name: "Acme" } })
-      }.not_to change(Professional, :count)
-      expect(response).to have_http_status(:ok)
+    it "doesn't stomp a second org the user still belongs to" do
+      pro = create(:professional, clerk_user_id: "user_abc", clerk_org_id: "org_stay")
+      org_go   = create(:organization, clerk_org_id: "org_go")
+      org_stay = create(:organization, clerk_org_id: "org_stay")
+      create(:organization_membership, professional: pro, organization: org_go)
+      create(:organization_membership, professional: pro, organization: org_stay)
+
+      post_event({
+        type: "organizationMembership.deleted",
+        data: {
+          organization: { id: "org_go" },
+          public_user_data: { user_id: "user_abc" }
+        }
+      })
+
+      expect(pro.reload.clerk_org_id).to eq("org_stay")
+      expect(OrganizationMembership.where(professional_id: pro.id).pluck(:organization_id))
+        .to eq([ org_stay.id ])
     end
   end
 end

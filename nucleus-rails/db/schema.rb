@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "extensions.pg_net"
   enable_extension "extensions.pg_stat_statements"
@@ -61,6 +61,44 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["user_id"], name: "index_ahoy_visits_on_user_id"
     t.index ["visit_token"], name: "index_ahoy_visits_on_visit_token", unique: true
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
+  end
+
+  create_table "audit_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "action", null: false
+    t.uuid "actor_id"
+    t.string "actor_type", default: "Professional"
+    t.uuid "auditable_id", null: false
+    t.string "auditable_type", null: false
+    t.jsonb "audited_changes", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.inet "ip_address"
+    t.uuid "organization_id", null: false
+    t.text "user_agent"
+    t.index ["actor_id"], name: "index_audit_logs_on_actor_id"
+    t.index ["auditable_type", "auditable_id"], name: "index_audit_logs_on_auditable_type_and_auditable_id"
+    t.index ["organization_id", "created_at"], name: "index_audit_logs_on_organization_id_and_created_at"
+    t.index ["organization_id"], name: "index_audit_logs_on_organization_id"
+  end
+
+  create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "organization_id", null: false
+    t.uuid "professional_id", null: false
+    t.string "role", default: "member", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id"], name: "index_organization_memberships_on_organization_id"
+    t.index ["professional_id", "organization_id"], name: "idx_memberships_on_pro_and_org", unique: true
+    t.index ["professional_id"], name: "index_organization_memberships_on_professional_id"
+  end
+
+  create_table "organizations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "clerk_org_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.string "slug"
+    t.datetime "updated_at", null: false
+    t.index ["clerk_org_id"], name: "index_organizations_on_clerk_org_id", unique: true
+    t.index ["slug"], name: "index_organizations_on_slug", unique: true, where: "(slug IS NOT NULL)"
   end
 
   create_table "professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -207,6 +245,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
+  add_foreign_key "audit_logs", "organizations", on_delete: :cascade
+  add_foreign_key "organization_memberships", "organizations", on_delete: :cascade
+  add_foreign_key "organization_memberships", "professionals", on_delete: :cascade
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

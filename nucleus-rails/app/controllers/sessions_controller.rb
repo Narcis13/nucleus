@@ -1,6 +1,12 @@
 class SessionsController < ApplicationController
-  skip_before_action :set_current_professional_as_tenant, only: :new
+  skip_before_action :set_current_context, only: :new
   skip_around_action :with_rls_tenant_setting, only: :new
+
+  # Sessions are pure auth flow — there's no authorizable record in play, so
+  # the global after_action :verify_authorized would otherwise raise here.
+  def skip_pundit_verification?
+    true
+  end
 
   def new
     redirect_to dashboard_path if clerk_signed_in?
