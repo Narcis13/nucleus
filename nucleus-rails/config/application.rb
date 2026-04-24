@@ -38,5 +38,10 @@ module NucleusRails
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+
+    # Supabase's Postgres ships with non-app schemas (extensions, graphql,
+    # vault) whose objects show up in the schema dumper and break
+    # db:schema:load on any fresh Supabase DB. Restrict dumps to public.
+    config.active_record.dump_schemas = "public"
   end
 end

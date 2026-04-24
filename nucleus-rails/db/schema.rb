@@ -11,8 +11,6 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
-  create_schema "extensions"
-
   # These are extensions that must be enabled in order to support this database
   enable_extension "extensions.pg_net"
   enable_extension "extensions.pg_stat_statements"
@@ -22,7 +20,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vault.supabase_vault"
 
-  create_table "public.ahoy_events", force: :cascade do |t|
+  create_table "ahoy_events", force: :cascade do |t|
     t.string "name"
     t.jsonb "properties"
     t.datetime "time"
@@ -34,7 +32,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["visit_id"], name: "index_ahoy_events_on_visit_id"
   end
 
-  create_table "public.ahoy_visits", force: :cascade do |t|
+  create_table "ahoy_visits", force: :cascade do |t|
     t.string "app_version"
     t.string "browser"
     t.string "city"
@@ -65,7 +63,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
   end
 
-  create_table "public.professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "clerk_org_id"
     t.string "clerk_user_id", null: false
     t.datetime "created_at", null: false
@@ -77,7 +75,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["clerk_user_id"], name: "index_professionals_on_clerk_user_id", unique: true
   end
 
-  create_table "public.solid_cache_entries", force: :cascade do |t|
+  create_table "solid_cache_entries", force: :cascade do |t|
     t.integer "byte_size", null: false
     t.datetime "created_at", null: false
     t.binary "key", null: false
@@ -88,7 +86,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["key_hash"], name: "index_solid_cache_entries_on_key_hash", unique: true
   end
 
-  create_table "public.solid_queue_blocked_executions", force: :cascade do |t|
+  create_table "solid_queue_blocked_executions", force: :cascade do |t|
     t.string "concurrency_key", null: false
     t.datetime "created_at", null: false
     t.datetime "expires_at", null: false
@@ -100,7 +98,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["job_id"], name: "index_solid_queue_blocked_executions_on_job_id", unique: true
   end
 
-  create_table "public.solid_queue_claimed_executions", force: :cascade do |t|
+  create_table "solid_queue_claimed_executions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "job_id", null: false
     t.bigint "process_id"
@@ -108,14 +106,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["process_id", "job_id"], name: "index_solid_queue_claimed_executions_on_process_id_and_job_id"
   end
 
-  create_table "public.solid_queue_failed_executions", force: :cascade do |t|
+  create_table "solid_queue_failed_executions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "error"
     t.bigint "job_id", null: false
     t.index ["job_id"], name: "index_solid_queue_failed_executions_on_job_id", unique: true
   end
 
-  create_table "public.solid_queue_jobs", force: :cascade do |t|
+  create_table "solid_queue_jobs", force: :cascade do |t|
     t.string "active_job_id"
     t.text "arguments"
     t.string "class_name", null: false
@@ -133,13 +131,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["scheduled_at", "finished_at"], name: "index_solid_queue_jobs_for_alerting"
   end
 
-  create_table "public.solid_queue_pauses", force: :cascade do |t|
+  create_table "solid_queue_pauses", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "queue_name", null: false
     t.index ["queue_name"], name: "index_solid_queue_pauses_on_queue_name", unique: true
   end
 
-  create_table "public.solid_queue_processes", force: :cascade do |t|
+  create_table "solid_queue_processes", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "hostname"
     t.string "kind", null: false
@@ -153,7 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["supervisor_id"], name: "index_solid_queue_processes_on_supervisor_id"
   end
 
-  create_table "public.solid_queue_ready_executions", force: :cascade do |t|
+  create_table "solid_queue_ready_executions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "job_id", null: false
     t.integer "priority", default: 0, null: false
@@ -163,7 +161,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["queue_name", "priority", "job_id"], name: "index_solid_queue_poll_by_queue"
   end
 
-  create_table "public.solid_queue_recurring_executions", force: :cascade do |t|
+  create_table "solid_queue_recurring_executions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "job_id", null: false
     t.datetime "run_at", null: false
@@ -172,7 +170,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["task_key", "run_at"], name: "index_solid_queue_recurring_executions_on_task_key_and_run_at", unique: true
   end
 
-  create_table "public.solid_queue_recurring_tasks", force: :cascade do |t|
+  create_table "solid_queue_recurring_tasks", force: :cascade do |t|
     t.text "arguments"
     t.string "class_name"
     t.string "command", limit: 2048
@@ -188,7 +186,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["static"], name: "index_solid_queue_recurring_tasks_on_static"
   end
 
-  create_table "public.solid_queue_scheduled_executions", force: :cascade do |t|
+  create_table "solid_queue_scheduled_executions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "job_id", null: false
     t.integer "priority", default: 0, null: false
@@ -198,7 +196,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["scheduled_at", "priority", "job_id"], name: "index_solid_queue_dispatch_all"
   end
 
-  create_table "public.solid_queue_semaphores", force: :cascade do |t|
+  create_table "solid_queue_semaphores", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "expires_at", null: false
     t.string "key", null: false
@@ -209,11 +207,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
-  add_foreign_key "public.solid_queue_blocked_executions", "public.solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "public.solid_queue_claimed_executions", "public.solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "public.solid_queue_failed_executions", "public.solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "public.solid_queue_ready_executions", "public.solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "public.solid_queue_recurring_executions", "public.solid_queue_jobs", column: "job_id", on_delete: :cascade
-  add_foreign_key "public.solid_queue_scheduled_executions", "public.solid_queue_jobs", column: "job_id", on_delete: :cascade
-
+  add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
 end
