@@ -75,10 +75,10 @@ These facts outlive any single session and apply to every contributor. Verify ag
 
 Nucleus is moving from Next.js 16 + RSC to Rails 8 + Hotwire. The 2-week spike finished in ~5 working days and passed 5 of 6 decision-gate questions. Part B (the 28-session full rebuild) is greenlit.
 
-- **Active plan:** `docs/Nucleus-Rails-Implementation-Plan-v1.0.md` (sessions Rs1–Rs28).
+- **Active plan:** `docs/Nucleus-Rails-Implementation-Plan-v1.0.md` v1.1 — 30 sessions: Rs1–Rs4, **Rs4.5 (API foundation)**, Rs5–Rs26, **Rs26.5 (OpenAPI + MCP)**, Rs27–Rs28.
 - **Working repo:** `nucleus-rails-spike/` is the spike. Part B lands in `nucleus-rails/` (sibling to `core-pro/`).
-- **Commit format:** one commit per session, `Rs{N}: <summary>` (e.g. `Rs5: clients CRUD + tags`). The spike days use `Spike Day N: <summary>`.
-- **Stack locked in:** Clerk (via `clerk-sdk-ruby`), Supabase Postgres + ActiveRecord + `acts_as_tenant` + RLS, ActionCable on Solid Cable, SolidQueue, Pay gem for Stripe (track `~> 11.0` — plan's `~> 8.0` pin is stale), Resend + ActionMailer, Kamal 2 on Hetzner.
+- **Commit format:** one commit per session, `Rs{N}: <summary>` (e.g. `Rs5: clients CRUD + tags`). Decimal sessions use `Rs{N.M}:` (e.g. `Rs4.5: API foundation`). The spike days use `Spike Day N: <summary>`.
+- **Stack locked in:** Clerk (via `clerk-sdk-ruby`), Supabase Postgres + ActiveRecord + `acts_as_tenant` + RLS, ActionCable on Solid Cable, SolidQueue, Pay gem for Stripe (track `~> 11.0` — plan's `~> 8.0` pin is stale), Resend + ActionMailer, Kamal 2 on Hetzner. **API/MCP layer:** `alba` for JSON serialization, `rswag-specs` (or `oas_rails`) for OpenAPI 3.1, `fast-mcp` for the `/mcp` server, `Rack::Attack` for per-token rate limiting.
 
 **Known debts carried from the spike into Part B:**
 1. Test env currently points at the dev Supabase DB; set up a local Postgres test DB in Rs1 so Minitest can run tenancy isolation automatically.
@@ -105,3 +105,17 @@ The pattern in `nucleus-rails-spike/app/models/application_record.rb` (`with_ten
 **Fail-closed check:** `NULLIF(current_setting('app.professional_id', true), '')::uuid` evaluates to NULL when unset, which fails the policy's equality check and blocks all rows.
 
 **How to apply:** Any Rails session that adds an RLS-protected table on Supabase must wrap request-path queries in `ApplicationRecord.with_tenant_setting` (or equivalent). Verify with an integration test (see `bin/verify_tenancy` for the live-DB equivalent) that inserts cross-tenant rows and asserts they're not visible. Never assume RLS "just works" in Supabase dev — BYPASSRLS roles make it a trap.
+
+## API + MCP layer — single source of truth in Rails
+
+Nucleus exposes its API (REST + JSON at `/api/v1`) and MCP server (at `/mcp`) **from the same Rails app** that renders the Hotwire UI. Foundations land in Rs4.5; OpenAPI spec + MCP server land in Rs26.5. Both are backed by the same `PersonalAccessToken` auth and the same service objects under `app/services/`.
+
+**Do not propose a separate TS/Hono service backed by the same Postgres.** Considered and rejected on 2026-04-24: business logic (acts_as_tenant, Pundit, Pay gating, validations, state machines, ActionCable broadcast callbacks, audit trails) lives above SQL. Two writers means no source of truth, and the BYPASSRLS gotcha would need to be re-implemented in TS too. A TS layer that *consumes* the Rails API is fine; one that writes to the same DB is not.
+
+**Patterns to enforce:**
+- Every write goes through an `ApplicationService` subclass returning a `Result`. HTML controllers and `Api::V1::*` controllers both call the same service object — no business logic in either controller.
+- `Api::V1::BaseController < ActionController::API` is **token-only**, no cookies, no CSRF. The auth concern wraps actions in `ApplicationRecord.with_tenant_setting` so RLS applies on the API path too.
+- Cross-tenant requests return **404, not 403** — silent isolation prevents enumeration.
+- Token lookup happens *inside* the `with_tenant_setting` block, not before it (RLS must apply to the auth query too).
+- Engines (Rs28) inherit the API + MCP contract by subclassing the Rs4.5 base classes and calling `register_mcp_tool` in their initializer — verticals get REST + MCP for free, no per-engine plumbing.
+- Webhook **emitters** are not in scope yet; agents poll the API. If the user asks for push, treat it as a separate scope decision.

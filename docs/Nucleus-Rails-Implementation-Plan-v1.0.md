@@ -541,6 +541,36 @@ end
 
 ---
 
+### Session Rs4.5 — API Foundation (Service Objects + JSON API + PAT Auth)
+
+**Goal:** Establish the pattern that lets every later session ship an API endpoint alongside its HTML controller without duplicating logic. Service objects own business rules; HTML and JSON controllers are thin adapters around them.
+
+**Tasks:**
+1. `ApplicationService` base class with `.call` returning a `Result` (success/failure + payload + errors). All write actions from Rs5 onward go through one. No business logic in controllers.
+2. `/api/v1` namespace mounted in `routes.rb`. `Api::V1::BaseController < ActionController::API` (no cookies, no CSRF — pure token).
+3. `PersonalAccessToken` model: `professional_id`, `name`, `token_digest` (bcrypt, never store plaintext), `scopes` (jsonb, e.g. `["clients:read", "appointments:write"]`), `last_used_at`, `revoked_at`. UI to issue/revoke under the dashboard.
+4. `Api::TokenAuth` concern: extracts `Authorization: Bearer ...`, looks up by digest, sets `Current.professional` and `Current.organization`, **then** wraps the action in `ApplicationRecord.with_tenant_setting` so RLS is enforced exactly like for browser requests. The BYPASSRLS gotcha (CLAUDE.md) applies here too.
+5. JSON serialization via `alba` — faster + simpler than Jbuilder, no partial-per-type sprawl. Resource classes live in `app/resources/api/v1/`.
+6. Error envelope: `{ error: { code, message, details } }`. 4xx returns the envelope; 5xx returns a request_id only. Pagination via Pagy with `Link` + `X-Total-Count` headers.
+7. Rate-limit tier in `Rack::Attack` keyed on token id (default 600/min/token, 50/min for unauthenticated).
+8. Example endpoint: `GET /api/v1/me` returns the authenticated professional + active scopes. Refactor the spike's `MessagesController` to use a `Messages::Create` service object — proves the pattern with a real existing controller.
+9. Request specs: missing token → 401, wrong scope → 403, **cross-tenant token → 404 (not 403, no information leak)**, over rate limit → 429 with `Retry-After`, pagination headers present.
+10. Document the service-object-and-two-controllers pattern in `docs/api-pattern.md` with one before/after diff. Rs5–Rs10 follow it.
+
+**Verification:**
+- `curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/v1/me` returns 200 JSON.
+- A token issued for tenant A gets 404 on tenant B's resources — confirmed by integration test that creates two orgs and asserts silent isolation.
+- Revoking a token in the UI makes the next request 401 immediately (no caching).
+- HTML and JSON controllers for the example resource both call the same service object — `git grep` shows zero business logic in either.
+- Brakeman clean; `bundle exec rspec spec/requests/api/` green.
+
+**Risks to watch:**
+- **CSRF bypass trap:** `Api::V1::BaseController` skips CSRF only because it also rejects cookie-based sessions. If a future engineer adds cookie auth back to the API base, CSRF protection silently disappears for browser sessions too. Add a request spec that asserts an authenticated cookie is *ignored* on `/api/v1`.
+- Token lookup MUST happen inside the `with_tenant_setting` block, not before it — the auth query itself needs RLS, or a leaked token from a deleted tenant could still see data.
+- Don't reach for Doorkeeper / OAuth2 here. PATs are sufficient for AI agents and personal automations and are a clean base if you later add OAuth for third-party apps.
+
+---
+
 ## Phase 2 — CRM Core (Rs5–Rs10)
 
 ### Session Rs5 — Clients (CRUD + Tags + Search)
@@ -559,6 +589,7 @@ end
 4. List view: server-side Ransack filters (status, tag, source), Pagy pagination, sort by columns. Bulk actions via Stimulus controller posting form-encoded `client_ids[]` to dedicated endpoints.
 5. CSV import: stream-parse via `CSV.foreach`, validate row by row, surface errors per row, confirm before commit.
 6. CSV export: stream response (`response.headers['Last-Modified'] = Time.now.httpdate`, `response.stream`).
+7. Follow the Rs4.5 pattern: each write action runs through a `Clients::*` service object; `Api::V1::ClientsController` exposes index/show/create/update/destroy as JSON, sharing the service objects with the HTML controller. Scopes: `clients:read`, `clients:write`.
 
 **Verification:**
 - Import 1,000-row CSV in <10 seconds with per-row validation.
@@ -577,6 +608,7 @@ end
 3. Lead Kanban: Sortable.js between columns. On drop, Stimulus posts to `PUT /leads/:id { stage_id: ... }` and the controller broadcasts a Turbo Stream update so other open browsers update too.
 4. Lead activity timeline: every action (note, email sent, stage change, form filled) creates a `LeadActivity` row. Render reverse-chronologically.
 5. Convert lead → client: button creates `Client` with metadata copied, sets `lead.converted_client_id`, archives the lead.
+6. Follow the Rs4.5 pattern: `Leads::Move`, `Leads::Convert` service objects; `Api::V1::LeadsController` exposes the pipeline as JSON (including stage move). Scopes: `leads:read`, `leads:write`.
 
 **Verification:**
 - Drag a card across columns, refresh, position holds.
@@ -594,6 +626,7 @@ end
 2. CRUD UI under `/dashboard/services`.
 3. Price displayed in professional's chosen currency (settings); use `money-rails` if you need multi-currency arithmetic later.
 4. Soft delete (set `is_active=false`) rather than hard delete — keep historical references intact.
+5. Follow the Rs4.5 pattern: `Services::*` service objects; `Api::V1::ServicesController` for read/write. Scopes: `services:read`, `services:write`.
 
 **Verification:** Create, edit, deactivate a service. Confirm it appears/disappears in booking widget (Rs8) and invoice line items (Rs12).
 
@@ -610,6 +643,7 @@ end
 4. Reminders: `appointment.send_reminder` job (SolidQueue) scheduled at appointment.start_at - 24h and -1h. Sends via ActionMailer + a notification.
 5. iCal feed: `GET /calendar/:professional_token.ics` returns an `Icalendar::Calendar` rendering of upcoming appointments. Token is per-professional, secret, regeneratable.
 6. (Optional, can defer) Google Calendar OAuth via `google-apis-calendar_v3`. Two-way sync: on save, upsert to Google; webhook on Google changes, update local. **Skip for nucleus; add when a vertical needs it.**
+7. Follow the Rs4.5 pattern: `Appointments::Create`, `Appointments::Reschedule`, `Appointments::Cancel` service objects; `Api::V1::AppointmentsController` for full CRUD with overlap-conflict 422s surfaced in the error envelope. Scopes: `appointments:read`, `appointments:write`.
 
 **Verification:**
 - Subscribe to the iCal feed in Apple Calendar; appointments appear within 5 minutes.
@@ -629,6 +663,7 @@ end
 4. Attachments: drag-drop or paste an image; ActiveStorage uploads to Supabase Storage (S3-compat). Thumbnail generated via `image_processing`.
 5. Quick-reply templates: per-organization library of canned responses, inserted into the input via `<details>` dropdown.
 6. Broadcast messages: from the dashboard, send one message to all clients matching a Ransack query. Background job creates one message per conversation (or one new conversation per client if none exists).
+7. Follow the Rs4.5 pattern: `Messages::Create`, `Conversations::MarkRead` service objects (the spike's `Messages::Create` from Rs4.5 graduates here); `Api::V1::ConversationsController` and `Api::V1::MessagesController` expose list/send/mark-read as JSON. Scopes: `messages:read`, `messages:write`. Critical for AI agents — most AI use cases involve reading/writing messages.
 
 **Verification:**
 - Two browsers, send 10 messages, all appear in real time, all persist.
@@ -648,6 +683,7 @@ end
 4. Renderer: ViewComponent that takes a `Form` schema and emits a Simple Form-styled form. Rate-limited submission via `rack-attack`.
 5. Pre-built templates seeded: Intake, GDPR consent, NPS, Feedback. Each is an `is_template=true` row in the `forms` table.
 6. Response analytics: per-field, response count + (for select fields) distribution chart.
+7. Follow the Rs4.5 pattern: `Forms::*` and `FormResponses::Submit` service objects; `Api::V1::FormsController` and `Api::V1::FormResponsesController` for list/read/submit. Scopes: `forms:read`, `forms:write`, `form_responses:read`, `form_responses:write`.
 
 **Verification:**
 - Build a 10-field form in <5 minutes via drag-drop.
@@ -998,6 +1034,35 @@ end
 
 ---
 
+### Session Rs26.5 — OpenAPI Spec + MCP Server
+
+**Goal:** Make the API discoverable to AI agents two ways: a published OpenAPI 3.1 spec for any agent that consumes tool specs, and a native MCP endpoint for MCP-aware clients (Claude Desktop, Claude Code, Anthropic SDK tool use). One auth model, two transports, same service objects.
+
+**Tasks:**
+1. Add `rswag-specs` (or `oas_rails`). Every Rs4.5+ request spec gets a spec block; running the test suite regenerates `openapi.yaml`. CI fails if the spec is out of date.
+2. Publish at `/api/v1/openapi.yaml` and `/api/v1/openapi.json`, version-pinned. Lint with `spectral` in CI.
+3. Mount a developer console at `/api/docs` (Scalar or Stoplight Elements) behind dashboard auth — professionals try their own endpoints with their own token, no copy-paste curl.
+4. Add `fast-mcp` gem. Mount MCP server at `/mcp` (HTTP+SSE transport, with HTTP fallback for proxies that buffer SSE).
+5. Register MCP tools as thin wrappers over Rs4.5 service objects: `list_clients`, `find_client`, `create_appointment`, `reschedule_appointment`, `send_message`, `list_conversations`, `get_pipeline_stage`. Tool JSON schemas derive from the service object's parameter contract — no separate definition.
+6. MCP authentication uses the same `PersonalAccessToken` from Rs4.5. Tool calls run through Pundit and `with_tenant_setting`. An MCP token cannot escape its tenant or its scopes.
+7. Add an "AI Access" panel to the dashboard: shows the MCP URL, generates a scoped token, copy-paste config snippets for Claude Desktop and Claude Code, with a one-page explainer aimed at non-technical professionals.
+8. Worked example in `docs/mcp-example.md`: a Claude conversation using the MCP server to triage new leads ("show me leads added this week with no follow-up, draft a message to each"). Use this as the demo for niche-vertical hand-off (Rs28).
+9. Tool descriptions reviewed as product copy. Each tool gets: a one-sentence purpose, a "when to use" line, and an example. Vague descriptions = agents misuse the tool.
+
+**Verification:**
+- `curl /api/v1/openapi.yaml` returns a spec; `spectral lint` passes with zero errors.
+- A throwaway TypeScript client generated via `openapi-typescript-codegen` compiles, authenticates, and round-trips a `GET /api/v1/clients`.
+- Claude Desktop configured with the generated token connects to `/mcp`, lists tools, and `list_clients` returns only the token's tenant.
+- An MCP token scoped `clients:read` fails `create_appointment` with a 403 captured in the MCP error frame.
+- `bin/rails test test/integration/mcp_*` covers tool discovery, tenant isolation, scope enforcement, and SSE stream stability.
+
+**Risks to watch:**
+- MCP transport spec is still moving. Pin `fast-mcp`, budget one breaking-change upgrade per year, and keep tool registration in one file to make migrations cheap.
+- SSE through Kamal + Caddy: confirm the proxy does not buffer the stream before deploying. Add a smoke test that opens a streamed tool call against production.
+- Webhook **emitters** (so external agents can subscribe to "new lead", "new message") are NOT in this session — they're a meaningful additional surface. Decide separately whether Nucleus needs them or if polling the API is enough for now.
+
+---
+
 ## Phase 10 — Deploy & Hand-Off (Rs27–Rs28)
 
 ### Session Rs27 — Production Deployment (Kamal on Hetzner)
@@ -1042,10 +1107,12 @@ end
    - **Background jobs**: engine adds jobs in `engines/<name>/app/jobs/`.
 4. Hand-off doc `VERTICAL-EXTENSION-GUIDE.md`: every category above with a worked example.
 5. Generator: `rails g vertical estate_core` scaffolds an engine with the right structure.
+6. Engine resources inherit the API contract: any model an engine adds gets a service object + `Api::V1::<Engine>::*` controller + MCP tool registration for free by inheriting the Rs4.5 base classes and calling `register_mcp_tool` in the engine's initializer. A vertical's data is reachable via REST and MCP without per-vertical plumbing.
 
 **Verification:**
 - Generate a `demo_vertical` engine, mount it, restart server, see "Demo Vertical" tab in nav.
 - Add a model to demo vertical, migrate, use it via the dashboard — works without touching core.
+- The same model is reachable at `/api/v1/demo_vertical/<resources>` and as an MCP tool, scoped to the active vertical.
 
 ---
 
@@ -1121,17 +1188,19 @@ These are explicitly out of scope for the nucleus. Verticals or future plans han
 | Rails 8 has a major bug | Very Low | High | Rails has 20-year track record of stability. Pin patch version. |
 | Founder's Ruby ramp-up takes longer than 4 weeks | Medium | Medium | Claude does the writing; founder does the reading. Reading Ruby is fast. |
 | Vertical engines turn out hard to compose | Medium | Medium | Pattern is well-trodden (Refinery CMS, Spree Commerce — both engine-based). Worst case: monorepo with namespaced modules instead of engines, also fine. |
+| Public API surface invites abuse (scraping, brute force, accidental over-fetching by misconfigured agents) | Medium | Medium | Per-token rate limiting (Rs4.5), required scopes per endpoint, audit log entries on every state change (Rs3), tenant isolation enforced via RLS (BYPASSRLS gotcha addressed in Rs4.5 token auth), 404-on-cross-tenant prevents enumeration. |
+| `fast-mcp` gem or MCP transport spec churns | Medium | Low | Pin gem version, isolate MCP tool registration in one file, budget one breaking-change upgrade per year. REST surface is unaffected by MCP churn. |
 
 ---
 
 # Total Effort Estimate
 
 - **Spike**: 2 weeks × 4 hours/day × 5 days = 40 hours
-- **Part B (28 sessions)**: 28 × 3 hours avg = 84 hours
+- **Part B (30 sessions)**: 30 × 3 hours avg = 90 hours (Rs4.5 + Rs26.5 added; the per-resource API hint inside Rs5–Rs10 adds ~30 min each, absorbed in the per-session average)
 - **Buffer for debugging, iteration, polish**: ~30%
-- **Total**: ~160 hours = ~10 weeks at 16 hours/week part-time, or 4 weeks at 40 hours/week full-time.
+- **Total**: ~170 hours = ~10–11 weeks at 16 hours/week part-time, or 4–5 weeks at 40 hours/week full-time.
 
-Compare to the Next.js path: 25 sessions done + 20 remaining for nucleus completion + ongoing fire-fighting. Similar total effort, but at the end you have a stack you trust.
+Compare to the Next.js path: 25 sessions done + 20 remaining for nucleus completion + ongoing fire-fighting. Similar total effort, but at the end you have a stack you trust *and* a first-class API surface for AI agents.
 
 ---
 
@@ -1140,5 +1209,6 @@ Compare to the Next.js path: 25 sessions done + 20 remaining for nucleus complet
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0 | 2026-04-23 | Narcis | Initial plan post Next.js → Rails decision |
+| 1.1 | 2026-04-24 | Narcis | Added Rs4.5 (API foundation: service objects + JSON API + PAT auth) and Rs26.5 (OpenAPI spec + MCP server). Rs5–Rs10 each gain a service-object/JSON controller task. Rs28 picks up engine-level API + MCP inheritance. Rationale: enable first-class AI-agent access to Nucleus data without spinning up a separate TS service against the same DB. |
 
 — *END OF DOCUMENT* —
