@@ -1,0 +1,5 @@
+<%= turbo_frame_tag "tab_messages" do %>
+  <%= render Ui::EmptyStateComponent.new(
+        title: "Messages",
+        description: "Conversations embed here once the messaging session ships.") %>
+<% end %>

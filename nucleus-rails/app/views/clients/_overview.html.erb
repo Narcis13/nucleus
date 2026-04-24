@@ -1,0 +1,28 @@
+<%= turbo_frame_tag "tab_overview" do %>
+  <div class="grid gap-4 md:grid-cols-2">
+    <%= render Ui::CardComponent.new(title: "Contact") do %>
+      <dl class="text-sm space-y-2">
+        <div>
+          <dt class="text-fg-muted">Email</dt>
+          <dd><%= client.email.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-fg-muted">Phone</dt>
+          <dd><%= client.phone.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-fg-muted">Source</dt>
+          <dd><%= client.source.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-fg-muted">Assigned to</dt>
+          <dd><%= client.assigned_professional&.email || "—" %></dd>
+        </div>
+      </dl>
+    <% end %>
+
+    <%= render Ui::CardComponent.new(title: "Overview") do %>
+      <div class="text-sm whitespace-pre-wrap text-fg"><%= client.notes.presence || "No notes yet." %></div>
+    <% end %>
+  </div>
+<% end %>

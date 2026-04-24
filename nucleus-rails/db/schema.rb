@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "extensions.pg_stat_statements"
   enable_extension "extensions.pgcrypto"
@@ -79,43 +79,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_120000) do
     t.index ["organization_id"], name: "index_audit_logs_on_organization_id"
   end
 
-  create_table "clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "email"
-    t.string "full_name"
-    t.string "phone"
-    t.uuid "professional_id", null: false
-    t.datetime "updated_at", null: false
-    t.index ["professional_id"], name: "index_clients_on_professional_id"
-  end
-
-  create_table "conversations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "client_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "client_id", null: false
     t.datetime "created_at", null: false
-    t.uuid "professional_id", null: false
+    t.uuid "tag_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["client_id"], name: "index_conversations_on_client_id"
-    t.index ["professional_id", "client_id"], name: "index_conversations_on_professional_id_and_client_id", unique: true
-    t.index ["professional_id"], name: "index_conversations_on_professional_id"
+    t.index ["client_id", "tag_id"], name: "index_client_tags_on_client_id_and_tag_id", unique: true
+    t.index ["client_id"], name: "index_client_tags_on_client_id"
+    t.index ["tag_id"], name: "index_client_tags_on_tag_id"
   end
 
-  create_table "messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.text "body", null: false
-    t.uuid "conversation_id", null: false
+  create_table "clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "assigned_professional_id"
     t.datetime "created_at", null: false
-    t.uuid "professional_id", null: false
-    t.string "sender_clerk_id", null: false
+    t.string "email"
+    t.string "full_name", null: false
+    t.text "notes"
+    t.uuid "organization_id", null: false
+    t.string "phone"
+    t.string "source"
+    t.string "status", default: "lead", null: false
     t.datetime "updated_at", null: false
-    t.index ["conversation_id", "created_at"], name: "index_messages_on_conversation_id_and_created_at"
-    t.index ["conversation_id"], name: "index_messages_on_conversation_id"
-    t.index ["professional_id"], name: "index_messages_on_professional_id"
-  end
-
-  create_table "notes", force: :cascade do |t|
-    t.text "body"
-    t.datetime "created_at", null: false
-    t.string "title"
-    t.datetime "updated_at", null: false
+    t.index "organization_id, lower((email)::text)", name: "index_clients_on_organization_and_lower_email", where: "(email IS NOT NULL)"
+    t.index ["assigned_professional_id"], name: "index_clients_on_assigned_professional_id"
+    t.index ["email"], name: "index_clients_on_email", where: "(email IS NOT NULL)"
+    t.index ["organization_id", "created_at"], name: "index_clients_on_organization_id_and_created_at"
+    t.index ["organization_id", "status"], name: "index_clients_on_organization_id_and_status"
+    t.index ["organization_id"], name: "index_clients_on_organization_id"
   end
 
   create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -408,12 +398,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_120000) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
+  create_table "tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "color", default: "#6b7280", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.uuid "organization_id", null: false
+    t.datetime "updated_at", null: false
+    t.index "organization_id, lower((name)::text)", name: "index_tags_on_organization_and_lower_name", unique: true
+    t.index ["organization_id"], name: "index_tags_on_organization_id"
+  end
+
   add_foreign_key "audit_logs", "organizations", on_delete: :cascade
-  add_foreign_key "clients", "professionals"
-  add_foreign_key "conversations", "clients"
-  add_foreign_key "conversations", "professionals"
-  add_foreign_key "messages", "conversations"
-  add_foreign_key "messages", "professionals"
+  add_foreign_key "client_tags", "clients", on_delete: :cascade
+  add_foreign_key "client_tags", "tags", on_delete: :cascade
+  add_foreign_key "clients", "organizations", on_delete: :cascade
+  add_foreign_key "clients", "professionals", column: "assigned_professional_id", on_delete: :nullify
   add_foreign_key "organization_memberships", "organizations", on_delete: :cascade
   add_foreign_key "organization_memberships", "professionals", on_delete: :cascade
   add_foreign_key "pay_charges", "pay_customers", column: "customer_id"
@@ -428,4 +427,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_120000) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "tags", "organizations", on_delete: :cascade
 end
