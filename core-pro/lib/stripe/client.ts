@@ -19,7 +19,7 @@ export const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   // Pin to the SDK's bundled API version. stripe-node v22+ exposes this as a
   // literal type; changing it should be a deliberate upgrade because response
   // shapes are tied to the version.
-  apiVersion: "2026-03-25.dahlia",
+  apiVersion: "2026-04-22.dahlia",
   typescript: true,
   telemetry: false,
 })

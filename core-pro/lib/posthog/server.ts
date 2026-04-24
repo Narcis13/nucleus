@@ -3,7 +3,6 @@ import "server-only"
 import { PostHog } from "posthog-node"
 
 import { env } from "@/lib/env"
-import { captureException } from "@/lib/sentry"
 
 // Lazy singleton so webhook / action handlers share a single PostHog client
 // across the lifetime of the Node process. In serverless environments (Vercel
@@ -27,7 +26,7 @@ export function getPostHogServer(): PostHog | null {
 export type ServerEventProperties = Record<string, unknown>
 
 // Fire-and-forget capture. Never throws — instrumentation must not break the
-// action/webhook it runs inside. Reports failures to Sentry instead.
+// action/webhook it runs inside. Logs failures via console.error instead.
 export async function captureServerEvent(args: {
   distinctId: string
   event: string
@@ -48,7 +47,7 @@ export async function captureServerEvent(args: {
     await client.shutdown()
     _client = null
   } catch (err) {
-    captureException(err, { tags: { module: "posthog", event: args.event } })
+    console.error(err, { tags: { module: "posthog", event: args.event } })
   }
 }
 
@@ -69,6 +68,6 @@ export async function identifyServer(args: {
     await client.shutdown()
     _client = null
   } catch (err) {
-    captureException(err, { tags: { module: "posthog", step: "identify" } })
+    console.error(err, { tags: { module: "posthog", step: "identify" } })
   }
 }

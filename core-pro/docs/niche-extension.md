@@ -71,8 +71,8 @@ Extend the Drizzle schema in `lib/db/schema/` with a matching file
   uses `withRLS` for every read.
 - Add a server-actions module under `lib/actions/fit/workouts.ts`
   that uses `authedAction`. Always pass `metadata.actionName` as a
-  namespaced string (`"fit.workouts.create"`) so Sentry tags and
-  rate-limit keys collide-free.
+  namespaced string (`"fit.workouts.create"`) so log tags and rate-limit
+  keys are collide-free.
 
 ### 4. Pages + navigation
 

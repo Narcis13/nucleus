@@ -16,7 +16,6 @@ import {
 } from "@/lib/db/schema"
 import { trackServerEvent } from "@/lib/posthog/events"
 import { identifyServer } from "@/lib/posthog/server"
-import { captureException } from "@/lib/sentry"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Clerk webhook endpoint — keeps Supabase state in sync with Clerk identity.
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
   try {
     evt = await verifyWebhook(req)
   } catch (err) {
-    captureException(err, { tags: { webhook: "clerk", stage: "verify" } })
+    console.error(err, { tags: { webhook: "clerk", stage: "verify" } })
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 400 },
@@ -103,7 +102,7 @@ export async function POST(req: NextRequest) {
         break
     }
   } catch (err) {
-    captureException(err, {
+    console.error(err, {
       tags: { webhook: "clerk", eventType: evt.type },
     })
     // Return 500 so Clerk retries. Svix will back off exponentially.

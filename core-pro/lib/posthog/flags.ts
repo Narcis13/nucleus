@@ -1,7 +1,6 @@
 import "server-only"
 
 import { getPostHogServer } from "@/lib/posthog/server"
-import { captureException } from "@/lib/sentry"
 import { getPlan, planAtLeast, type PlanFeature, type PlanId } from "@/lib/stripe/plans"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +92,7 @@ export async function isFeatureEnabled(
     })
     return result === true
   } catch (err) {
-    captureException(err, { tags: { module: "posthog", flag } })
+    console.error(err, { tags: { module: "posthog", flag } })
     return FALLBACK_DEFAULTS[flag] ?? false
   }
 }
@@ -119,7 +118,7 @@ export async function getFeatureFlagValue(
     })
     return value ?? false
   } catch (err) {
-    captureException(err, { tags: { module: "posthog", flag } })
+    console.error(err, { tags: { module: "posthog", flag } })
     return FALLBACK_DEFAULTS[flag] ?? false
   }
 }

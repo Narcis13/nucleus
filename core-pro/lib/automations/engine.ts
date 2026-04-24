@@ -22,7 +22,6 @@ import {
   getCampaignTemplate,
 } from "@/lib/marketing/templates"
 import { fromAddress, getResend } from "@/lib/resend/client"
-import { captureException } from "@/lib/sentry"
 
 import type {
   ActionContext,
@@ -223,7 +222,7 @@ export async function processAutomationChain(
         .where(eq(automationLogs.id, log.id))
     }
   } catch (err) {
-    captureException(err, { tags: { automation: "chain" } })
+    console.error(err, { tags: { automation: "chain" } })
     if (log?.id) {
       await dbAdmin
         .update(automationLogs)
@@ -354,7 +353,7 @@ async function enqueueChain(args: {
     })
     return true
   } catch (err) {
-    captureException(err, { tags: { automation: "enqueue" } })
+    console.error(err, { tags: { automation: "enqueue" } })
     return false
   }
 }

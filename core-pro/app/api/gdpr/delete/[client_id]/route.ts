@@ -9,7 +9,6 @@ import {
   professionalClients,
   professionals,
 } from "@/lib/db/schema"
-import { captureException } from "@/lib/sentry"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +102,7 @@ export async function POST(
         await admin.storage.from(bucket).remove(paths)
       }
     } catch (err) {
-      captureException(err, {
+      console.error(err, {
         tags: { route: "gdpr.delete", bucket },
         extra: { clientId: client_id, professionalId: professional.id },
       })
@@ -120,7 +119,7 @@ export async function POST(
       const clerk = await clerkClient()
       await clerk.users.deleteUser(client.clerkUserId)
     } catch (err) {
-      captureException(err, {
+      console.error(err, {
         tags: { route: "gdpr.delete", stage: "clerk" },
         extra: { clientId: client_id },
       })

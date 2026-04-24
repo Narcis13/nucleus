@@ -16,7 +16,6 @@ import {
 import { sendNotification } from "@/lib/notifications/send"
 import { fromAddress, getResend } from "@/lib/resend/client"
 import { makeEmailTranslator } from "@/lib/resend/translator"
-import { captureException } from "@/lib/sentry"
 import type { Branding, Invoice, InvoiceLineItem } from "@/types/domain"
 
 import InvoiceEmail, {
@@ -32,8 +31,8 @@ import InvoiceEmail, {
 // don't have to carry the whole graph.
 //
 // Sends are best-effort: a missing Resend key returns silently, network errors
-// land in Sentry. We never want an invoice action to fail because email is
-// down.
+// log via console.error. We never want an invoice action to fail because email
+// is down.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type InvoiceContext = {
@@ -180,7 +179,7 @@ async function dispatch(
     })
     return { sent: true }
   } catch (err) {
-    captureException(err, { tags: { invoice_email: kind } })
+    console.error(err, { tags: { invoice_email: kind } })
     return { sent: false }
   }
 }

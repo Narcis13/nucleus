@@ -5,7 +5,6 @@ import { Redis } from "@upstash/redis"
 import { Resend } from "resend"
 
 import { env } from "@/lib/env"
-import { captureException } from "@/lib/sentry"
 import type { PlanId } from "@/lib/stripe/plans"
 
 import {
@@ -208,14 +207,14 @@ export async function sendEmail<K extends EmailTemplateId>(
       headers: args.headers,
     })
     if (response.error) {
-      captureException(response.error, {
+      console.error(response.error, {
         tags: { email_template: args.template },
       })
       return { sent: false, reason: "error", error: response.error }
     }
     return { sent: true, id: response.data?.id ?? null }
   } catch (error) {
-    captureException(error, { tags: { email_template: args.template } })
+    console.error(error, { tags: { email_template: args.template } })
     return { sent: false, reason: "error", error }
   }
 }

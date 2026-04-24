@@ -10,22 +10,21 @@ import { z } from "zod"
 
 import { withRLS, type Tx } from "@/lib/db/rls"
 import { apiRateLimit } from "@/lib/ratelimit"
-import { captureException } from "@/lib/sentry"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Base client — shared error handling, metadata schema, and Sentry reporting.
-// Every action factory below extends this. Keep this file the single source of
-// truth for action shape; route-specific behaviour goes into per-action `.use`.
+// Base client — shared error handling and metadata schema. Every action
+// factory below extends this. Keep this file the single source of truth for
+// action shape; route-specific behaviour goes into per-action `.use`.
 // ─────────────────────────────────────────────────────────────────────────────
 const baseClient = createSafeActionClient({
   defineMetadataSchema() {
-    // `actionName` is required so Sentry tags + ratelimit prefixes are useful.
+    // `actionName` is required so log tags + ratelimit prefixes are useful.
     return z.object({
       actionName: z.string(),
     })
   },
   handleServerError(error, utils) {
-    captureException(error, {
+    console.error(error, {
       tags: {
         actionName: utils.metadata?.actionName ?? "unknown",
       },
@@ -76,7 +75,7 @@ async function ratelimitKey(prefix: string): Promise<string> {
 // ─────────────────────────────────────────────────────────────────────────────
 // publicAction — no auth required. Validates input via Zod, applies the
 // generic API ratelimit (skipped when Upstash is unconfigured locally), and
-// reports errors to Sentry.
+// logs errors via console.error.
 // ─────────────────────────────────────────────────────────────────────────────
 export const publicAction = baseClient.use(async ({ next, metadata }) => {
   if (apiRateLimit) {

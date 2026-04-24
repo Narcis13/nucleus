@@ -1,4 +1,3 @@
-// Next.js 16 renamed `middleware.ts` to `proxy.ts`. Same semantics, new file.
 // Wires Clerk auth (clerkMiddleware) and Upstash ratelimit enforcement
 // for auth / webhook / API routes.
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
@@ -73,10 +72,10 @@ export default clerkMiddleware(async (auth, req) => {
 })
 
 export const config = {
-  // Run on everything except static files, Next internals, and public
-  // utility routes that must never touch Clerk (health check, Sentry tunnel).
+  // Run on everything except static files, Next internals, and the public
+  // health check route that must never touch Clerk.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|monitoring|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)",
     "/(api(?!/health)|trpc)(.*)",
   ],
 }

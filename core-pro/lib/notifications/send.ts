@@ -10,7 +10,6 @@ import { listPushSubscriptionsForUser } from "@/lib/db/queries/push-subscription
 import { resolveChannels } from "@/lib/notifications/preferences"
 import { sendPush } from "@/lib/notifications/push"
 import { getResend, fromAddress } from "@/lib/resend/client"
-import { captureException } from "@/lib/sentry"
 import type {
   NotificationChannel,
   NotificationType,
@@ -28,8 +27,8 @@ import NotificationEmail from "@/emails/notification"
 // Channel delivery respects user preferences AND quiet hours. The in-app row
 // is always written, even inside quiet hours, so unread counts stay correct.
 //
-// The function is resilient: a failure in any one channel is reported to
-// Sentry but does not prevent the others from firing. The return value
+// The function is resilient: a failure in any one channel is logged but
+// does not prevent the others from firing. The return value
 // surfaces what actually happened so callers can act on it (for example, to
 // show "push couldn't be delivered" in a settings test-notification flow).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,7 +103,7 @@ export async function sendNotification(
       })
       result.delivered.in_app = true
     } catch (err) {
-      captureException(err, { tags: { notification: "in_app" } })
+      console.error(err, { tags: { notification: "in_app" } })
     }
   }
 
@@ -129,7 +128,7 @@ export async function sendNotification(
         result.delivered.email = true
       }
     } catch (err) {
-      captureException(err, { tags: { notification: "email" } })
+      console.error(err, { tags: { notification: "email" } })
     }
   }
 
@@ -149,7 +148,7 @@ export async function sendNotification(
         if (res.delivered) result.delivered.push.delivered += 1
       }
     } catch (err) {
-      captureException(err, { tags: { notification: "push" } })
+      console.error(err, { tags: { notification: "push" } })
     }
   }
 

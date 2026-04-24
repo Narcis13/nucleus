@@ -40,7 +40,6 @@ import { expandMergeTags, type MergeTagContext } from "@/lib/marketing/templates
 import { trackServerEvent } from "@/lib/posthog/events"
 import { publicFormRateLimit } from "@/lib/ratelimit"
 import { fromAddress, getResend } from "@/lib/resend/client"
-import { captureException } from "@/lib/sentry"
 import { getPlan, planLimitsFor } from "@/lib/stripe/plans"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 import type { EmailCampaignAudience, PlanLimits } from "@/types/domain"
@@ -312,7 +311,7 @@ export const sendCampaignAction = authedAction
           await bumpCampaignSentCounter(campaign.id, 25)
         }
       } catch (err) {
-        captureException(err, { tags: { action: "marketing.sendCampaign" } })
+        console.error(err, { tags: { action: "marketing.sendCampaign" } })
         await markRecipientSent({
           id: row.id,
           error: err instanceof Error ? err.message : "Unknown error",
@@ -567,7 +566,7 @@ export const deleteLeadMagnetAction = authedAction
     try {
       await getSupabaseAdmin().storage.from(MARKETING_BUCKET).remove([row.fileKey])
     } catch (err) {
-      captureException(err, { tags: { action: "marketing.deleteLeadMagnet" } })
+      console.error(err, { tags: { action: "marketing.deleteLeadMagnet" } })
     }
 
     const ok = await deleteLeadMagnetQuery(parsedInput.id)
@@ -676,7 +675,7 @@ export const requestLeadMagnetAction = publicAction
         })
       url = data?.signedUrl ?? null
     } catch (err) {
-      captureException(err, { tags: { action: "marketing.requestLeadMagnet" } })
+      console.error(err, { tags: { action: "marketing.requestLeadMagnet" } })
     }
     if (!url) {
       const admin = getSupabaseAdmin()

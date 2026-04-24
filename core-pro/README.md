@@ -11,11 +11,9 @@ it through reserved `_niche/` extension points — see
 
 ## Stack
 
-- **Next.js 16** with the App Router, typed routes, and the renamed
-  `proxy.ts` middleware file. See the notes in
-  `node_modules/next/dist/docs/` before changing framework-facing code — this
-  is not the Next.js you know.
-- **React 19.2** with Server Components by default.
+- **Next.js 15.5** (LTS) with the App Router, typed routes, and a
+  `middleware.ts` file at the repo root.
+- **React 19.0** with Server Components by default.
 - **Clerk** for auth + Organizations; Supabase Third-Party Auth integration
   (no JWT templates).
 - **Supabase** for Postgres, Storage, and Realtime. RLS is scoped by Clerk
@@ -25,7 +23,7 @@ it through reserved `_niche/` extension points — see
   `supabase/migrations/`.
 - **Stripe** for subscriptions (starter / growth / pro / enterprise).
 - **Resend** for transactional email; **Trigger.dev v4** for background jobs.
-- **Sentry** for errors; **PostHog** for analytics + feature flags.
+- **PostHog** for analytics + feature flags.
 - **Upstash Redis** for rate limiting and ephemeral caches.
 - **base-ui + shadcn-style** components under `components/ui/` with Tailwind 4.
 
@@ -103,7 +101,7 @@ app/
 │   └── _niche/     ← extension point
 ├── api/            Route handlers: webhooks, PDFs, iCal, GDPR, health, …
 ├── error.tsx       App-level error boundary
-├── global-error.tsx Root-document-level boundary (Sentry-reported)
+├── global-error.tsx Root-document-level boundary
 ├── not-found.tsx   App-level 404
 └── offline/        PWA offline fallback
 
@@ -126,7 +124,6 @@ lib/
 ├── ratelimit/      Upstash limiters (auth, api, webhook, form, health)
 ├── resend/         Email render + send helpers, fixtures
 ├── scheduling/     iCal + reminder orchestration
-├── sentry/         captureException wrapper
 ├── stripe/         Client, plans, usage counter, webhook handlers
 ├── supabase/       Browser + SSR + admin clients, realtime hooks
 └── triggers/       Trigger.dev job registrations
@@ -144,7 +141,7 @@ supabase/migrations/  SQL migrations (app tables, RLS, storage, realtime)
   The two helper functions `app_current_professional_id()` and
   `app_current_client_id()` (SECURITY DEFINER) break the potential policy
   recursion between `clients` and `professional_clients`.
-- **Rate limiting**: enforced by `proxy.ts` middleware plus per-action
+- **Rate limiting**: enforced by `middleware.ts` plus per-action
   guards in `lib/actions/safe-action.ts`. Public endpoints additionally
   gate on `publicFormRateLimit`.
 - **Webhooks**: Stripe and Clerk webhooks verify their HMAC signatures
@@ -155,10 +152,6 @@ supabase/migrations/  SQL migrations (app tables, RLS, storage, realtime)
 
 ### Observability
 
-- **Sentry**: `sentry.server.config.ts`, `sentry.edge.config.ts`, and
-  `instrumentation-client.ts`. Source maps are uploaded then deleted by
-  `@sentry/nextjs` (`deleteSourcemapsAfterUpload: true`). Sentry requests
-  are tunneled through `/monitoring` so ad blockers don't break reporting.
 - **PostHog**: client + server adapters emit feature usage events. Server
   events go through `lib/posthog/server.ts` with a short flush window so
   edge/API handlers don't block.

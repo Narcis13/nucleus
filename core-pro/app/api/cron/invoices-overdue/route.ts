@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server"
 
 import { env } from "@/lib/env"
 import { runOverdueChecker } from "@/lib/invoices/overdue-checker"
-import { captureException } from "@/lib/sentry"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Manual / external cron entry for the invoice overdue sweep.
@@ -35,7 +34,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
     const report = await runOverdueChecker()
     return NextResponse.json({ ok: true, ...report })
   } catch (err) {
-    captureException(err, { tags: { cron: "invoices-overdue" } })
+    console.error(err, { tags: { cron: "invoices-overdue" } })
     return NextResponse.json(
       { ok: false, error: "Sweep failed" },
       { status: 500 },

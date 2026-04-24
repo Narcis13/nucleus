@@ -39,7 +39,7 @@ export default async function MarketingLayout({
                 <Link href="/dashboard">
                   <Button size="sm">{t("goToDashboard")}</Button>
                 </Link>
-                <UserButton afterSignOutUrl="/" />
+                <UserButton />
               </>
             ) : (
               <>
