@@ -24,7 +24,14 @@
   </head>
 
   <body>
-    <main class="container mx-auto mt-28 px-5 flex">
+    <header class="container mx-auto mt-4 px-5 flex justify-between items-center">
+      <%= link_to "Nucleus", root_path, class: "font-semibold" %>
+      <%= render "shared/clerk_islands" %>
+    </header>
+    <main class="container mx-auto mt-8 px-5 flex">
+      <% flash.each do |type, msg| %>
+        <div class="flash flash-<%= type %>"><%= msg %></div>
+      <% end %>
       <%= yield %>
     </main>
   </body>

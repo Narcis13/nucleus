@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_23_200940) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_063516) do
   create_schema "extensions"
 
   # These are extensions that must be enabled in order to support this database
@@ -63,6 +63,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_200940) do
     t.index ["user_id"], name: "index_ahoy_visits_on_user_id"
     t.index ["visit_token"], name: "index_ahoy_visits_on_visit_token", unique: true
     t.index ["visitor_token", "started_at"], name: "index_ahoy_visits_on_visitor_token_and_started_at"
+  end
+
+  create_table "public.professionals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "clerk_org_id"
+    t.string "clerk_user_id", null: false
+    t.datetime "created_at", null: false
+    t.string "email"
+    t.string "full_name"
+    t.string "role", default: "owner", null: false
+    t.datetime "updated_at", null: false
+    t.index ["clerk_org_id"], name: "index_professionals_on_clerk_org_id"
+    t.index ["clerk_user_id"], name: "index_professionals_on_clerk_user_id", unique: true
   end
 
   create_table "public.solid_cache_entries", force: :cascade do |t|
