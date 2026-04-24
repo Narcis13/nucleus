@@ -37,7 +37,7 @@ class ApplicationService
   # :forbidden, :conflict) that Api::V1::BaseController maps to an HTTP
   # status. `errors` may be an ActiveModel::Errors, a hash, or a string —
   # the API base renders a consistent shape regardless.
-  def failure(code, errors: nil, message: nil)
-    Result.failure(code: code, errors: errors, message: message)
+  def failure(code, errors: nil, message: nil, **data)
+    Result.failure(code: code, errors: errors, message: message, data: data)
   end
 end

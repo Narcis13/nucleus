@@ -9,7 +9,7 @@
     <div class="flex items-center gap-2">
       <%= link_to "Import CSV", import_new_clients_path,
             class: "inline-flex items-center justify-center h-10 px-4 rounded-md border border-border text-sm" %>
-      <%= link_to "Export CSV", export_clients_path(q: params[:q]),
+      <%= link_to "Export CSV", export_clients_path(q: params[:q]&.permit(:full_name_or_email_cont, :status_eq, :source_eq, :tags_id_in)&.to_h),
             class: "inline-flex items-center justify-center h-10 px-4 rounded-md border border-border text-sm" %>
       <%= link_to "New client", new_client_path,
             class: "inline-flex items-center justify-center h-10 px-4 rounded-md bg-primary text-on-primary text-sm font-medium" %>
@@ -76,7 +76,7 @@
                 </td>
                 <td class="px-4 py-2 text-fg-muted"><%= client.email %></td>
                 <td class="px-4 py-2">
-                  <%= render Ui::BadgeComponent.new(variant: status_variant(client.status)) { client.status.titleize } %>
+                  <%= render(Ui::BadgeComponent.new(variant: status_variant(client.status))) { client.status.titleize } %>
                 </td>
                 <td class="px-4 py-2">
                   <% client.tags.each do |tag| %>

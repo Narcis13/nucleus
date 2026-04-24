@@ -5,7 +5,7 @@
     <div class="space-y-1">
       <h1 class="text-2xl font-semibold"><%= @client.full_name %></h1>
       <div class="flex items-center gap-2 text-sm text-fg-muted">
-        <%= render Ui::BadgeComponent.new(variant: status_variant(@client.status)) { @client.status.titleize } %>
+        <%= render(Ui::BadgeComponent.new(variant: status_variant(@client.status))) { @client.status.titleize } %>
         <% if @client.email.present? %><span>· <%= @client.email %></span><% end %>
         <% if @client.phone.present? %><span>· <%= @client.phone %></span><% end %>
         <% if @client.source.present? %><span>· <%= @client.source %></span><% end %>

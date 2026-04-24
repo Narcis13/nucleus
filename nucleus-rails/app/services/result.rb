@@ -13,8 +13,8 @@ class Result
     new(success: true, data: payload)
   end
 
-  def self.failure(code:, errors: nil, message: nil)
-    new(success: false, code: code, errors: errors, message: message)
+  def self.failure(code:, errors: nil, message: nil, data: {})
+    new(success: false, code: code, errors: errors, message: message, data: data)
   end
 
   def initialize(success:, data: {}, code: nil, errors: nil, message: nil)

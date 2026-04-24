@@ -36,14 +36,18 @@ class ApplicationController < ActionController::Base
     Current.professional = current_professional
     Current.request_meta = { ip: request.remote_ip, user_agent: request.user_agent }
 
-    set_current_tenant(current_professional)
-
     org = resolve_active_organization
     return unless org
 
     Current.organization = org
     Current.organization_membership =
       OrganizationMembership.find_by(professional_id: current_professional.id, organization_id: org.id)
+
+    # acts_as_tenant is declared `acts_as_tenant :organization` on Client/Tag,
+    # so the current tenant must be the Organization — passing the Professional
+    # here makes the gem's before_validation overwrite organization_id with the
+    # professional's id on every create, which then fails belongs_to :organization.
+    set_current_tenant(org)
   end
 
   # Resolves the tenant org for this request.

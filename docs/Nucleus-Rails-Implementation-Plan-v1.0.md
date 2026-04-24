@@ -1,7 +1,7 @@
 # Nucleus on Rails — Implementation Plan
 
-**Version:** 1.0
-**Date:** 2026-04-23
+**Version:** 1.2
+**Date:** 2026-04-24
 **Author:** Narcis (with architectural assist)
 **Purpose:** Rebuild the CorePro/Nucleus boilerplate on Rails 8 + Hotwire after deciding to leave Next.js 16 + RSC behind. Same product, same locked-in dependencies (Clerk, Supabase, Resend, Stripe), different runtime.
 **Predecessor:** `nucleus-Implementation-Plan.md` (Next.js plan; reference only — do not re-execute)
@@ -1116,6 +1116,120 @@ end
 
 ---
 
+# Feature Parity with core-pro
+
+**Bar:** The Rails rebuild must reach **~95% user-facing feature parity** with `core-pro/` (the Next.js reference) before v1.0 ships. Parity is measured against user-facing behavior, not implementation. New features added to core-pro after 2026-04-24 don't retroactively become parity requirements — they land as their own sessions.
+
+**Why this section exists:** The original v1.0 plan was structured around "things to build," not "things core-pro already does." A diff against core-pro surfaced four areas where the session scope undersells what users already have on the Next.js side. Rather than rewrite existing sessions, the gaps land as decimal sessions below plus a coverage matrix that the CLAUDE.md parity directive points at.
+
+## Coverage Matrix
+
+Status legend: ✅ covered by session scope as written · 🟡 partially covered, see notes · 🆕 new decimal session added below · ⛔ intentionally out of scope
+
+| core-pro area | Key user-facing features | Rails plan coverage |
+|---|---|---|
+| Auth & Orgs | Clerk sign-in, orgs, team invite, role-based access | ✅ Rs2 + Rs3 |
+| CRM / Clients | Roster, search, tags, portal invite, CSV import/export | ✅ Rs5 |
+| Leads pipeline | Kanban, stages, activities, convert-to-client | ✅ Rs6 |
+| Calendar & Appointments | Month/week view, availability rules, iCal, 24h/1h reminders, buffer | ✅ Rs8 |
+| Services catalog | CRUD, pricing, duration, public listing | ✅ Rs7 |
+| Messaging | 2-way chat, media, read receipts, realtime | ✅ Rs9 (ActionCable in place of Supabase Realtime) |
+| Forms builder | Schema-as-JSON, assignments, responses, templates | ✅ Rs10 |
+| Documents | Upload, signed URLs, per-client sharing, storage quota | ✅ Rs11 |
+| **Invoicing** | Invoice CRUD, line items, status lifecycle, payment recording, overdue sweep with tiered reminders, PDF | 🟡 Rs12 covers PDF + sequential numbering + monthly auto-gen; the CRUD/status/payments/sweep scope lands in **🆕 Rs12.5**. |
+| Billing (Stripe) | Checkout, portal, plan change, dunning, receipt PDF | ✅ Rs13 + Rs14 |
+| Marketing: Email campaigns | Compose, segment, schedule, per-recipient tracking (opens/clicks) | 🟡 Rs15 covers compose/send/schedule. Per-recipient tracking via Resend webhook is a sub-task to add to Rs15 (see note below). |
+| Marketing: Social templates | Branded post templates | ✅ Rs16 |
+| Marketing: Lead magnets | Gated PDFs, lead capture | ✅ Rs17 |
+| Automations | Trigger/action workflows, logs | ✅ Rs18 |
+| Notifications | In-app, email, web-push, preferences, quiet hours | ✅ Rs19 |
+| **PWA** | Installable, offline fallback, share-target, VAPID push plumbing | 🟡 Rs19 registers the SW for push. Install/offline/share-target land in **🆕 Rs19.5**. |
+| Micro-site | Slug + custom domain, themes, sections, SEO, publish/unpublish | ✅ Rs20 + Rs21 |
+| Micro-site analytics | Visits, sources, conversion | ✅ Rs21 |
+| **Dashboard analytics** | KPI cards + charts (clients/leads/revenue/appointments/messaging), date range, CSV/PDF export | 🆕 **Rs21.5**. |
+| Client portal | Home, messages, documents, forms, appointments, niche-specific progress | ✅ Rs22 + Rs23 |
+| i18n & time zones | Locales per user, timezone-aware dates | ✅ Rs24 |
+| GDPR | Per-client export, account delete, cascading | ✅ Rs25 |
+| Settings pages | Profile, branding, calendar, integrations, notifications, team, danger | 🟡 Distributed across Rs3 (org/team), Rs4 (design), Rs19 (notifications), Rs24 (i18n), Rs25 (GDPR/danger). Each session owns its settings sub-page; no consolidated Rs24.5 needed — flagged here so nothing falls through. |
+| Observability | Sentry, PostHog, health check | ✅ Rs26 |
+| API + MCP | REST + MCP, PAT auth, OpenAPI spec | ✅ Rs4.5 + Rs26.5 |
+| Deployment | Kamal on Hetzner | ✅ Rs27 |
+| Vertical engines | Extension seams | ✅ Rs28 |
+| AI assistants / LLM features | Chat with client data | ⛔ Out of scope for nucleus (per "What This Plan Does NOT Cover" below). AI agents reach nucleus via MCP (Rs26.5). |
+
+## Scope Notes for Existing Sessions
+
+These don't need new sessions; they need one extra task inside the session they already belong to.
+
+- **Rs15 (Email Campaigns)** — add a task: wire a Resend webhook endpoint that updates `email_campaign_recipients.opened_at` / `clicked_at` / `failed_at`. Parallels the Stripe webhook idempotency pattern (dedupe via event id). Core-pro depends on this for campaign analytics.
+- **Rs4 (Design System)** — the settings *shell* layout (sub-nav, section pages) lives here. Individual settings sub-pages land with their owning session (profile fields with Rs2, branding fields with Rs20, etc.).
+- **Rs3 (Multi-tenancy)** — add the team-invite UI task explicitly. Clerk Organizations already exposes invite-member endpoints; the Rails side needs a settings sub-page that lists memberships, resends invites, removes members. Role editing comes out of the `OrganizationMembership.role` field that Rs3 already introduces.
+
+---
+
+### Session Rs12.5 — Invoicing (CRUD + Payment Tracking + Overdue Sweep)
+
+**Goal:** Complete invoicing experience matching core-pro: invoices with line items, status lifecycle, partial payment recording, automated overdue sweeping, and client-side portal visibility. Rs12 already ships the `Invoice` model + Prawn PDF + sequential numbering; Rs12.5 builds the workflow around it.
+
+**Tasks:**
+1. `InvoicesController` full CRUD (HTML): list (with status/date filters), new, edit, show (with line-item table + payment history). Line items as a nested form using `fields_for`; `Invoice` accepts `has_many :line_items, dependent: :destroy`, each with `service_id?`, `description`, `qty`, `unit_price`.
+2. Status machine on `Invoice.status`: `draft → sent → viewed → paid` (terminal), `sent|viewed → overdue` (auto), `any → voided`. Use a plain Ruby state class, not a gem — the rules fit in 30 lines.
+3. `InvoicePayment` model (`invoice_id`, `amount_cents`, `received_on`, `method`, `note`). Recording a payment auto-transitions the invoice to `paid` when summed payments ≥ total; partial payments leave status unchanged but update "balance due."
+4. `Invoices::Send` service: renders the Prawn PDF (Rs12), attaches via Resend, marks `sent_at`. `Invoices::MarkViewed` fires on the first GET to the client-portal invoice page. Both go through `Api::V1::InvoicesController` too (scopes: `invoices:read`, `invoices:write`).
+5. Overdue sweep: SolidQueue recurring job `InvoicesOverdueJob` runs daily at 09:00 UTC. Flips `sent|viewed` past `due_on` to `overdue`, dispatches tiered reminders (friendly at +0 days, firm at +7, final at +14). `PaymentReminder` audit row logs what was sent and when — idempotent via (`invoice_id`, `reminder_level`).
+6. Invoice dashboard cards: Outstanding, Overdue, Paid this month, Avg days to pay. Live-refreshed via Turbo Stream when payments land.
+7. Portal: clients see their own invoices at `/portal/invoices`, can mark-viewed (implicit on GET), download PDF.
+
+**Verification:**
+- Create invoice with 3 line items → totals compute correctly in the UI and the PDF.
+- Record a partial payment → balance due updates, status stays `sent`. Record the remainder → status auto-transitions to `paid`.
+- Rewind an invoice's `due_on` to 10 days ago, run the sweep job → status → `overdue`, first reminder email sent. Re-running same day is a no-op (idempotent).
+- Client signs into portal → sees their invoice, opens it → status becomes `viewed`, professional's dashboard reflects it live.
+- API path: `PATCH /api/v1/invoices/:id` with a valid PAT (scope `invoices:write`) transitions state; cross-tenant request returns 404.
+
+---
+
+### Session Rs19.5 — PWA Shell (Install, Offline, Share Target, Push)
+
+**Goal:** Nucleus installs as a PWA on iOS/Android/desktop, serves an offline fallback page when network is gone, accepts shared content from the device share sheet, and has the plumbing Rs19 needs to deliver web-push notifications.
+
+**Tasks:**
+1. `/manifest.json` from a Rails controller (not a static file — org branding may influence icon/theme colors). Icons (192/512, maskable) live in `public/icons/`. Start URL = `/dashboard`.
+2. Service worker at `/service_worker.js` via `Pwa::ServiceWorkerController`. Strategy: network-first for HTML/JSON, cache-first for CSS/JS/font assets (fingerprinted by the asset pipeline so cache invalidation is automatic). Precache the offline page.
+3. Offline fallback at `/offline` — simple ERB page with "you're offline, queued actions will retry" copy. Service worker `catch()` handler returns this when a navigation fetch fails.
+4. Share Target: manifest declares `share_target` pointing at `POST /share`. `SharesController#create` receives title/text/url, stores a draft note or lead (configurable per-user), redirects to an editor.
+5. Web Push: VAPID key pair generated once (`rails pwa:vapid_keys`), stored in credentials. `PushSubscription` model (binds `Professional` or `Client` to the browser's `endpoint`/`keys`). Rs19's `NewMessageNotification#web_push` reads from this table.
+6. Install prompt: Stimulus controller captures `beforeinstallprompt`, shows a dismissible banner once per device. iOS path: "Add to Home Screen" instructions modal (iOS doesn't fire `beforeinstallprompt`).
+
+**Verification:**
+- Lighthouse PWA audit passes (installable, offline-capable, valid manifest).
+- Install on Chrome desktop → standalone window, icon in launcher.
+- Kill the network → navigate to a page you haven't visited → offline fallback renders. Bring network back → next navigation succeeds.
+- Share a URL from an Android browser into Nucleus → lands in the editor with the URL pre-filled.
+- Rs19's push delivery works: create a test notification from console → browser push arrives even with the tab closed.
+
+---
+
+### Session Rs21.5 — Dashboard Analytics
+
+**Goal:** The `/dashboard/analytics` KPI page from core-pro: stat cards + charts across clients, leads, revenue, appointments, messaging; date range picker; CSV/PDF export.
+
+**Tasks:**
+1. `DashboardAnalyticsController#show` computes per-section metrics in `Analytics::*` service objects (one per section: `Analytics::Clients`, `Analytics::Leads`, `Analytics::Revenue`, `Analytics::Appointments`, `Analytics::Messaging`). Each returns a `Result` with cards + chart series. Per CLAUDE.md rule 1 in the parity directive, all five share the same interface so the view loops them.
+2. Chart rendering via Chartkick + Groupdate (both pure-Ruby on server side; renders to Chart.js on the client). No bespoke chart JS.
+3. Date range picker as a Stimulus controller; re-submits the page with `?from=…&to=…` (simple URL params — bookmarkable, stateless).
+4. CSV export: streams? No — reuses the Rs12.5 `send_data` pattern (the tx-scoped RLS doesn't play nicely with ActionController::Live; see `project_nucleus_actioncontroller_live_rls` memory). Each section has an `export_csv` action.
+5. PDF export: single endpoint `DashboardAnalyticsController#export.pdf` renders the same view through ChromicPDF (Rs12 infra) so the PDF matches what's on screen.
+6. Access: Pundit `AnalyticsPolicy` — `owner?` required (not `member?`); team members may or may not see revenue, per org settings.
+
+**Verification:**
+- Load `/dashboard/analytics` with a seeded dataset of 50 clients / 30 leads / 20 invoices / 40 appointments — all five sections render, numbers match manual SQL count checks.
+- Date range picker narrows to last 7/30/90/custom days; URL is shareable.
+- Export CSV for each section → row count matches the card count. Export PDF → looks identical to the HTML.
+- Two tenants with overlapping IDs cannot see each other's charts (RLS is on — no `.unscoped` anywhere).
+
+---
+
 # Cross-Cutting Concerns (Apply Everywhere)
 
 ## Testing Strategy
@@ -1196,7 +1310,7 @@ These are explicitly out of scope for the nucleus. Verticals or future plans han
 # Total Effort Estimate
 
 - **Spike**: 2 weeks × 4 hours/day × 5 days = 40 hours
-- **Part B (30 sessions)**: 30 × 3 hours avg = 90 hours (Rs4.5 + Rs26.5 added; the per-resource API hint inside Rs5–Rs10 adds ~30 min each, absorbed in the per-session average)
+- **Part B (33 sessions)**: 33 × 3 hours avg = 99 hours (Rs4.5 + Rs26.5 added in v1.1; Rs12.5 + Rs19.5 + Rs21.5 added in v1.2 for core-pro parity. Per-resource API hints inside Rs5–Rs10 absorbed in the per-session average.)
 - **Buffer for debugging, iteration, polish**: ~30%
 - **Total**: ~170 hours = ~10–11 weeks at 16 hours/week part-time, or 4–5 weeks at 40 hours/week full-time.
 
@@ -1210,5 +1324,6 @@ Compare to the Next.js path: 25 sessions done + 20 remaining for nucleus complet
 |---|---|---|---|
 | 1.0 | 2026-04-23 | Narcis | Initial plan post Next.js → Rails decision |
 | 1.1 | 2026-04-24 | Narcis | Added Rs4.5 (API foundation: service objects + JSON API + PAT auth) and Rs26.5 (OpenAPI spec + MCP server). Rs5–Rs10 each gain a service-object/JSON controller task. Rs28 picks up engine-level API + MCP inheritance. Rationale: enable first-class AI-agent access to Nucleus data without spinning up a separate TS service against the same DB. |
+| 1.2 | 2026-04-24 | Narcis | Added "Feature Parity with core-pro" section with a coverage matrix plus three new decimal sessions (Rs12.5 Invoicing, Rs19.5 PWA, Rs21.5 Dashboard Analytics) and scope notes on Rs15/Rs4/Rs3. Rationale: diff against `core-pro/` surfaced four features whose scope undersold what already exists on the Next.js side; explicit parity bar prevents these falling through the cracks during the rebuild. |
 
 — *END OF DOCUMENT* —

@@ -11,7 +11,7 @@ module Tags
 
       tag = Tag.new(@attrs)
       tag.organization = @organization
-      return failure(:invalid, errors: tag.errors) unless tag.save
+      return failure(:invalid, errors: tag.errors, tag: tag) unless tag.save
 
       success(tag: tag)
     end

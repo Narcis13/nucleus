@@ -20,7 +20,7 @@ class Tag < ApplicationRecord
   validates :name, uniqueness: { scope: :organization_id, case_sensitive: false }
 
   def self.ransackable_attributes(_auth_object = nil)
-    %w[name created_at]
+    %w[id name created_at]
   end
 
   def self.ransackable_associations(_auth_object = nil)

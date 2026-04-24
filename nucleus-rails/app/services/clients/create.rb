@@ -16,7 +16,7 @@ module Clients
       client = Client.new(@attrs)
       client.organization = @organization
 
-      return failure(:invalid, errors: client.errors) unless client.save
+      return failure(:invalid, errors: client.errors, client: client) unless client.save
 
       success(client: client)
     end

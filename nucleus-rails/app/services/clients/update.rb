@@ -7,7 +7,7 @@ module Clients
     end
 
     def call
-      return failure(:invalid, errors: @client.errors) unless @client.update(@attrs)
+      return failure(:invalid, errors: @client.errors, client: @client) unless @client.update(@attrs)
       success(client: @client)
     end
   end

@@ -30,7 +30,7 @@ class TagsController < ApplicationController
     if result.success?
       redirect_to tags_path, notice: "Tag created."
     else
-      @tag = Tag.new(tag_params)
+      @tag = result.tag || Tag.new(tag_params)
       flash.now[:alert] = "Could not create tag."
       render :new, status: :unprocessable_content
     end

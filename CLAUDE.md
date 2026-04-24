@@ -84,9 +84,11 @@ Nucleus is moving from Next.js 16 + RSC to Rails 8 + Hotwire. The 2-week spike f
 1. Test env currently points at the dev Supabase DB; set up a local Postgres test DB in Rs1 so Minitest can run tenancy isolation automatically.
 2. Pay's shipped `AddPayStiColumns` migration renames a just-created column and needs `safety_assured` to pass `strong_migrations`.
 
-## `core-pro/` is reference-only
+## `core-pro/` is reference-only — and it's the parity bar
 
 The Next.js-path boilerplate (`core-pro/`) is frozen after the Rails decision. Read it for product behavior; do not add features, do not port fixes back, do not depend on it from anything new.
+
+**But** it is the **feature-parity bar** for the Rails rebuild: before the Rails app ships v1.0 it must reach ~95% user-facing parity with `core-pro/` as of 2026-04-24. The parity matrix + new sessions that close identified gaps live in `docs/Nucleus-Rails-Implementation-Plan-v1.0.md` under "Feature Parity with core-pro" (Rs12.5 Invoicing, Rs19.5 PWA, Rs21.5 Dashboard Analytics + scope notes on Rs15/Rs4/Rs3). When scoping a Rails session, check that matrix before deciding something is out of scope; "core-pro already does this" means it's in scope. New features landed in core-pro *after* 2026-04-24 don't retroactively become parity requirements — they're their own sessions.
 
 That codebase's locked stack (documented here so a fresh session doesn't "helpfully modernize" it): Next.js 16 with middleware in `proxy.ts` (renamed in v16, not `middleware.ts`), React 19, Drizzle ORM (schema in `lib/db/schema/`, migrations in `supabase/migrations/`), Clerk native Third-Party Auth with Supabase (NOT the deprecated April 2025 JWT template flow — uses `accessToken` callback), `@dnd-kit` for DnD, `@react-pdf/renderer` for PDFs, `next-safe-action` for Server Actions, Trigger.dev v4, Stripe v22 (`new Stripe(key)` required), `zod@4` with `zod/mini` in client bundles.
 

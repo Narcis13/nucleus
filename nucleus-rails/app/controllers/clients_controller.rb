@@ -62,7 +62,7 @@ class ClientsController < ApplicationController
     if result.success?
       redirect_to client_path(result.client), notice: "Client created."
     else
-      @client = Client.new(client_params)
+      @client = result.client || Client.new(client_params)
       flash.now[:alert] = "Could not create client."
       render :new, status: :unprocessable_content
     end

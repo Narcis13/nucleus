@@ -5,11 +5,12 @@ module Clients
     before_action :require_clerk_user!
     before_action :require_active_organization!
 
-    # Streaming CSV. ActionController::Live lets us start the response body
-    # before the full result set has been built, which keeps memory flat for
-    # large exports. The `Last-Modified` header is a nod to the Rs5 plan
-    # note — it also makes browsers' "download again?" prompt behave.
-    include ActionController::Live
+    # CSV export. We intentionally don't include ActionController::Live: Rails
+    # runs Live responses on a separate thread that checks out its own DB
+    # connection, which doesn't inherit the SET LOCAL-scoped RLS GUCs/role
+    # that the around_action establishes — so RLS silently returns zero rows.
+    # Buffer the body instead; large-tenant streaming can come back later
+    # once the tenant setting is pushed onto the per-connection layer.
 
     def show
       authorize Client, :export?
@@ -17,19 +18,13 @@ module Clients
       scope = policy_scope(Client).reorder(created_at: :asc)
       scope = scope.ransack(params[:q]).result if params[:q].present?
 
-      response.headers["Content-Type"] = "text/csv; charset=utf-8"
-      response.headers["Content-Disposition"] = %(attachment; filename="clients-#{Time.current.strftime('%Y%m%d')}.csv")
-      response.headers["Last-Modified"] = Time.current.httpdate
-      response.headers["Cache-Control"] = "no-cache"
-      response.headers["X-Accel-Buffering"] = "no"
-
       result = Clients::Export.call(scope: scope)
-      result.rows.each { |line| response.stream.write(line) }
-    rescue IOError
-      # Client disconnected; nothing to do.
-      nil
-    ensure
-      response.stream.close
+      body = result.rows.to_a.join
+
+      send_data body,
+        type: "text/csv; charset=utf-8",
+        filename: "clients-#{Time.current.strftime('%Y%m%d')}.csv",
+        disposition: "attachment"
     end
 
     private
