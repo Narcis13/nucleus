@@ -31,4 +31,37 @@ class Professional < ApplicationRecord
       p.save!
     end
   end
+
+  # Returns (creating if needed) a 1:1 "personal" Organization + owner
+  # membership for this professional. Nucleus is a solo-pro product; the
+  # org layer exists so shared data (clients, leads, services) has a
+  # tenancy key that can later grow into a brokerage/studio, but solo
+  # users never see it.
+  #
+  # The synthetic clerk_org_id lives in a "personal_*" namespace distinct
+  # from Clerk's real "org_*" ids, so if the user later creates or joins
+  # a Clerk organization the webhook inserts a separate row — no
+  # collision, no migration needed.
+  #
+  # Must be called from the postgres (BYPASSRLS) path — i.e. before the
+  # request's RLS around_action opens its transaction. set_current_context
+  # satisfies that.
+  def ensure_personal_organization!
+    synthetic_id = "personal_#{clerk_user_id}"
+
+    Organization.transaction do
+      org = Organization.find_by(clerk_org_id: synthetic_id) ||
+            Organization.create!(
+              clerk_org_id: synthetic_id,
+              name: full_name.presence || email.presence || "Personal workspace"
+            )
+      OrganizationMembership.find_by(professional_id: id, organization_id: org.id) ||
+        OrganizationMembership.create!(professional: self, organization: org, role: "owner")
+      org
+    end
+  rescue ActiveRecord::RecordNotUnique
+    # Concurrent first-login race: another request won the insert. The
+    # next lookup will find the winner's row.
+    retry
+  end
 end

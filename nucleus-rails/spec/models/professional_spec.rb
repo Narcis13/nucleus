@@ -52,6 +52,37 @@ RSpec.describe Professional, type: :model do
     end
   end
 
+  describe "#ensure_personal_organization!" do
+    let(:pro) { create(:professional, clerk_user_id: "user_solo", email: "s@example.com", full_name: "Solo Pro") }
+
+    it "creates a personal org + owner membership on first call" do
+      expect {
+        pro.ensure_personal_organization!
+      }.to change(Organization, :count).by(1)
+       .and change(OrganizationMembership, :count).by(1)
+
+      org = Organization.find_by(clerk_org_id: "personal_user_solo")
+      expect(org).to be_present
+      expect(org.name).to eq("Solo Pro")
+      membership = OrganizationMembership.find_by(professional: pro, organization: org)
+      expect(membership.role).to eq("owner")
+    end
+
+    it "is idempotent" do
+      pro.ensure_personal_organization!
+      expect {
+        pro.ensure_personal_organization!
+      }.to change(Organization, :count).by(0)
+       .and change(OrganizationMembership, :count).by(0)
+    end
+
+    it "uses a 'personal_' prefix distinct from Clerk's 'org_' namespace" do
+      org = pro.ensure_personal_organization!
+      expect(org.clerk_org_id).to start_with("personal_")
+      expect(org.clerk_org_id).not_to start_with("org_")
+    end
+  end
+
   describe "role predicates" do
     it "exposes owner?, member?, client?" do
       expect(build(:professional, :owner).owner?).to be true

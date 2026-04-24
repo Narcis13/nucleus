@@ -46,15 +46,23 @@ class ApplicationController < ActionController::Base
       OrganizationMembership.find_by(professional_id: current_professional.id, organization_id: org.id)
   end
 
-  # Clerk's session carries the currently active organization. Until we wire
-  # a first-class reader for it, fall back to the clerk_org_id the webhook
-  # backfilled onto Professional. When Rs5+ needs per-request org switching,
-  # swap this to read Clerk's session claims directly.
+  # Resolves the tenant org for this request.
+  #
+  # Two paths:
+  #   1. A real Clerk organization is pinned on the professional (webhook
+  #      populated clerk_org_id). Use that row — this is the broker/team
+  #      path from the Rs3 plan.
+  #   2. No Clerk org (solo professional, the default). Auto-provision a
+  #      "personal" org on first login so solo users never see the
+  #      "join an organization" message. The schema still carries
+  #      organization_id on shared data; the UI just never surfaces it.
   def resolve_active_organization
     clerk_org_id = current_professional.clerk_org_id
-    return nil if clerk_org_id.blank?
+    if clerk_org_id.present? && (org = Organization.find_by(clerk_org_id: clerk_org_id))
+      return org
+    end
 
-    Organization.find_by(clerk_org_id: clerk_org_id)
+    current_professional.ensure_personal_organization!
   end
 
   def with_rls_tenant_setting
