@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "extensions.pg_stat_statements"
   enable_extension "extensions.pgcrypto"
@@ -106,6 +106,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_130000) do
     t.index ["organization_id", "created_at"], name: "index_clients_on_organization_id_and_created_at"
     t.index ["organization_id", "status"], name: "index_clients_on_organization_id_and_status"
     t.index ["organization_id"], name: "index_clients_on_organization_id"
+  end
+
+  create_table "lead_activities", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "activity_type", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.uuid "lead_id", null: false
+    t.jsonb "metadata"
+    t.index ["lead_id", "created_at"], name: "index_lead_activities_on_lead_id_and_created_at"
+    t.index ["lead_id"], name: "index_lead_activities_on_lead_id"
+  end
+
+  create_table "lead_stages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "color", default: "#6366f1", null: false
+    t.datetime "created_at", null: false
+    t.boolean "is_default", default: false, null: false
+    t.boolean "is_lost", default: false, null: false
+    t.boolean "is_won", default: false, null: false
+    t.string "name", null: false
+    t.uuid "organization_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "position"], name: "index_lead_stages_on_organization_id_and_position"
+    t.index ["organization_id"], name: "index_lead_stages_on_organization_id"
+  end
+
+  create_table "leads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "converted_client_id"
+    t.datetime "created_at", null: false
+    t.string "email"
+    t.string "full_name", null: false
+    t.jsonb "metadata"
+    t.text "notes"
+    t.uuid "organization_id", null: false
+    t.string "phone"
+    t.integer "score", default: 0, null: false
+    t.string "source"
+    t.uuid "stage_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["converted_client_id"], name: "index_leads_on_converted_client_id"
+    t.index ["organization_id", "created_at"], name: "index_leads_on_organization_id_and_created_at"
+    t.index ["organization_id"], name: "index_leads_on_organization_id"
+    t.index ["stage_id"], name: "index_leads_on_stage_id"
   end
 
   create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -413,6 +456,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_130000) do
   add_foreign_key "client_tags", "tags", on_delete: :cascade
   add_foreign_key "clients", "organizations", on_delete: :cascade
   add_foreign_key "clients", "professionals", column: "assigned_professional_id", on_delete: :nullify
+  add_foreign_key "lead_activities", "leads", on_delete: :cascade
+  add_foreign_key "lead_stages", "organizations", on_delete: :cascade
+  add_foreign_key "leads", "clients", column: "converted_client_id", on_delete: :nullify
+  add_foreign_key "leads", "lead_stages", column: "stage_id", on_delete: :restrict
+  add_foreign_key "leads", "organizations", on_delete: :cascade
   add_foreign_key "organization_memberships", "organizations", on_delete: :cascade
   add_foreign_key "organization_memberships", "professionals", on_delete: :cascade
   add_foreign_key "pay_charges", "pay_customers", column: "customer_id"

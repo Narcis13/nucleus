@@ -1,0 +1,20 @@
+<%# Inline stage CRUD + reordering. The stage_list element is the Sortable
+    container for reordering; each row has its own update/delete form. %>
+<%= render Ui::ModalComponent.new(id: "stage_manager", title: "Pipeline stages") do %>
+  <div class="flex flex-col gap-3">
+    <p class="text-xs text-fg-muted">
+      Drag rows to reorder. The order here is the order of columns on the board.
+    </p>
+
+    <ul id="stage_list"
+        class="flex flex-col gap-2"
+        data-controller="stage-reorder"
+        data-stage-reorder-reorder-url-value="<%= reorder_lead_stages_path %>">
+      <% stages.each do |stage| %>
+        <%= render "lead_stages/row", stage: stage %>
+      <% end %>
+    </ul>
+
+    <%= render "lead_stages/new_row" %>
+  </div>
+<% end %>

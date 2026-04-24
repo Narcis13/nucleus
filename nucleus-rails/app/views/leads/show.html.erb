@@ -1,0 +1,6 @@
+<%# Rendered layout-less when Turbo fetches the frame; the index view
+    hosts the outer turbo_frame_tag "lead_detail" wrapper, and this view
+    supplies its replacement content. %>
+<%= turbo_frame_tag "lead_detail" do %>
+  <%= render "leads/detail", lead: @lead, stages: @stages, activities: @activities %>
+<% end %>

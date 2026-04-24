@@ -1,0 +1,34 @@
+<li class="rounded-md border border-border p-3 bg-surface cursor-grab active:cursor-grabbing"
+    id="<%= dom_id(stage) %>"
+    data-stage-id="<%= stage.id %>"
+    data-stage-reorder-target="row">
+  <%= form_with(url: lead_stage_path(stage), method: :patch,
+                html: { class: "flex flex-col gap-2" },
+                data: { turbo: true }) do %>
+    <div class="flex items-center gap-2">
+      <input type="color" name="lead_stage[color]" value="<%= stage.color %>"
+             aria-label="Stage color"
+             class="h-8 w-9 cursor-pointer rounded border border-border bg-transparent p-0">
+      <%= text_field_tag "lead_stage[name]", stage.name,
+            class: "h-9 flex-1 rounded-md border border-border bg-surface-2 px-2 text-sm" %>
+      <%= button_to "Delete", lead_stage_path(stage), method: :delete,
+            form: { class: "inline", data: { turbo_confirm: "Delete #{stage.name}?" } },
+            class: "h-9 px-3 rounded-md border border-border text-xs text-danger" %>
+    </div>
+    <div class="flex items-center gap-4 pl-1 text-xs">
+      <label class="flex items-center gap-1.5">
+        <%= check_box_tag "lead_stage[is_won]", "1", stage.is_won %>
+        Won stage
+      </label>
+      <label class="flex items-center gap-1.5">
+        <%= check_box_tag "lead_stage[is_lost]", "1", stage.is_lost %>
+        Lost stage
+      </label>
+      <span class="ml-auto text-fg-muted">Position <%= stage.position %></span>
+    </div>
+    <div class="flex justify-end">
+      <%= submit_tag "Save",
+            class: "inline-flex items-center justify-center h-8 px-3 rounded-md border border-border text-xs" %>
+    </div>
+  <% end %>
+</li>

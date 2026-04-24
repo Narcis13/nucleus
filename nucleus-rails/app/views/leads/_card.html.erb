@@ -1,0 +1,45 @@
+<%# One draggable card. The li's id is set from Rails' dom_id so that
+    Turbo Stream `replace` / `remove` targets match whether the card is
+    rendered inline or re-broadcast from another tab. The `data-lead-id`
+    is what the Sortable onEnd handler reads when posting the move. %>
+<li class="group rounded-md border border-border bg-surface-2 p-3 text-sm shadow-xs cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+    id="<%= dom_id(lead) %>"
+    data-leads-pipeline-target="card"
+    data-lead-id="<%= lead.id %>"
+    data-stage-id="<%= lead.stage_id %>">
+  <%= link_to lead_path(lead),
+        data: { turbo_frame: "lead_detail" },
+        class: "flex w-full flex-col gap-2 text-left" do %>
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface text-[10px] font-semibold text-fg-muted">
+          <%= lead.full_name.split(" ").filter_map { |p| p[0] }.first(2).join.upcase.presence || "?" %>
+        </span>
+        <p class="truncate font-medium"><%= lead.full_name %></p>
+      </div>
+      <% if lead.score.to_i > 0 %>
+        <span class="inline-flex items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-fg-muted">
+          ★ <%= lead.score %>
+        </span>
+      <% end %>
+    </div>
+    <div class="flex flex-col gap-1 text-xs text-fg-muted">
+      <% if lead.email.present? %>
+        <p class="truncate">✉ <%= lead.email %></p>
+      <% end %>
+      <% if lead.phone.present? %>
+        <p class="truncate">☎ <%= lead.phone %></p>
+      <% end %>
+    </div>
+    <div class="flex items-center justify-between gap-2 text-[11px] text-fg-muted">
+      <% if lead.source.present? %>
+        <span class="inline-flex items-center rounded-full bg-surface px-2 py-0.5 text-[10px]">
+          <%= lead.source %>
+        </span>
+      <% else %>
+        <span></span>
+      <% end %>
+      <span><%= lead.created_at.strftime("%b %-d") %></span>
+    </div>
+  <% end %>
+</li>

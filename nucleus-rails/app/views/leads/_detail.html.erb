@@ -1,0 +1,149 @@
+<%# Slide-over panel for a single lead. The frame wrapper lives on the
+    parent (leads/index + leads/show), so this partial just renders the
+    content that gets swapped in. Clicking the backdrop or × closes it by
+    navigating the `lead_detail` frame back to an empty state. %>
+<div class="fixed inset-0 z-30 flex justify-end"
+     data-controller="lead-detail">
+  <a href="<%= leads_path %>"
+     data-turbo-frame="lead_detail"
+     class="absolute inset-0 bg-black/40"
+     aria-label="Close"></a>
+  <div class="relative z-40 h-full w-full max-w-md overflow-y-auto bg-bg border-l border-border shadow-xl">
+    <header class="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+      <div>
+        <h2 class="text-lg font-semibold"><%= lead.full_name %></h2>
+        <p class="text-xs text-fg-muted">
+          Created <%= l(lead.created_at.to_date, format: :long) %><%= " · #{lead.source}" if lead.source.present? %>
+        </p>
+      </div>
+      <%= link_to "×", leads_path,
+            class: "h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-surface-2 text-xl leading-none",
+            data: { turbo_frame: "lead_detail" },
+            aria: { label: "Close" } %>
+    </header>
+
+    <div class="flex flex-col gap-5 p-5">
+      <%# Stage selector. Submits as a normal form so a browser without
+          JS can still move a lead — the move endpoint accepts both JSON
+          and turbo_stream formats. %>
+      <section class="flex flex-col gap-2">
+        <label class="text-xs font-medium text-fg-muted">Stage</label>
+        <%= form_with url: move_lead_path(lead), method: :post, local: false,
+                      data: { controller: "auto-submit", leads_pipeline_move_form: true } do |f| %>
+          <%= f.select :stage_id,
+                stages.map { |s| [ s.name, s.id ] },
+                { selected: lead.stage_id },
+                class: "h-9 w-full rounded-md border border-border bg-surface px-2 text-sm",
+                data: { action: "change->auto-submit#submit" } %>
+        <% end %>
+      </section>
+
+      <section class="rounded-md border border-border bg-surface p-3 text-sm space-y-2">
+        <p class="text-xs font-medium text-fg-muted">Contact</p>
+        <div class="flex items-center gap-2"><span class="text-fg-muted">✉</span> <span class="truncate"><%= lead.email.presence || "—" %></span></div>
+        <div class="flex items-center gap-2"><span class="text-fg-muted">☎</span> <span class="truncate"><%= lead.phone.presence || "—" %></span></div>
+      </section>
+
+      <%# Inline edit of score + notes. Single form to keep it simple; the
+          HTML controller's update action routes to Leads::Update. %>
+      <%= form_with url: lead_path(lead), method: :patch, local: false, class: "flex flex-col gap-4" do |f| %>
+        <section class="flex flex-col gap-2">
+          <label class="text-xs font-medium text-fg-muted" for="lead_score">Score (0–100)</label>
+          <%= f.number_field :score, value: lead.score, min: 0, max: 100,
+                name: "lead[score]", id: "lead_score",
+                class: "h-9 w-24 rounded-md border border-border bg-surface px-2 text-sm" %>
+        </section>
+        <section class="flex flex-col gap-2">
+          <label class="text-xs font-medium text-fg-muted" for="lead_notes">Notes</label>
+          <%= f.text_area :notes, value: lead.notes, name: "lead[notes]", id: "lead_notes",
+                rows: 4,
+                class: "rounded-md border border-border bg-surface p-2 text-sm" %>
+        </section>
+        <div class="flex justify-end">
+          <%= f.submit "Save",
+                class: "inline-flex items-center justify-center h-9 px-4 rounded-md border border-border text-sm" %>
+        </div>
+      <% end %>
+
+      <%# Log activity form. %>
+      <section class="rounded-md border border-border bg-surface p-3">
+        <p class="text-xs font-medium text-fg-muted pb-2">Log activity</p>
+        <%= form_with url: lead_activities_path(lead), method: :post, local: false,
+                      data: { action: "turbo:submit-end->leads-pipeline#resetForm" },
+                      class: "flex flex-col gap-2" do %>
+          <div class="flex items-center gap-2">
+            <%= select_tag "activity_type",
+                  options_for_select([ %w[Note note], %w[Call call], %w[Email email], %w[Meeting meeting] ], "note"),
+                  class: "h-9 w-32 rounded-md border border-border bg-surface-2 px-2 text-xs" %>
+            <%= text_field_tag "description", nil,
+                  placeholder: "What happened?", required: true,
+                  class: "h-9 flex-1 rounded-md border border-border bg-surface-2 px-2 text-sm" %>
+          </div>
+          <div class="flex justify-end">
+            <%= button_tag "Log",
+                  class: "inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-on-primary text-xs" %>
+          </div>
+        <% end %>
+      </section>
+
+      <%# Reverse-chronological timeline. Per-lead Turbo Stream subscribes
+          so activities appended from another tab flow in instantly. %>
+      <%= turbo_stream_from "organization", Current.organization.id, "leads", "activity", lead.id %>
+      <section class="flex flex-col gap-2">
+        <p class="text-xs font-medium text-fg-muted">Activity timeline</p>
+        <ul id="lead_activity_list" class="flex flex-col gap-2">
+          <% if activities.empty? %>
+            <li class="rounded-md border border-dashed border-border p-3 text-center text-xs text-fg-muted">
+              No activity yet.
+            </li>
+          <% else %>
+            <% activities.each do |a| %>
+              <%= render "lead_activities/activity", activity: a %>
+            <% end %>
+          <% end %>
+        </ul>
+      </section>
+
+      <%# Convert / mark lost. %>
+      <section class="flex flex-col gap-2 border-t border-border pt-4">
+        <% if lead.converted? %>
+          <div class="rounded-md border border-border bg-surface p-3 text-xs text-fg-muted">
+            ✓ Converted to client.
+            <%= link_to "Open profile", client_path(lead.converted_client_id),
+                  class: "ml-2 underline" %>
+          </div>
+        <% else %>
+          <div class="flex flex-wrap gap-2">
+            <%= button_to "Convert to client", convert_lead_path(lead),
+                  method: :post,
+                  disabled: lead.email.blank?,
+                  form: { data: { turbo_frame: "_top" } },
+                  class: "inline-flex items-center justify-center h-9 px-4 rounded-md bg-primary text-on-primary text-sm disabled:opacity-50" %>
+            <% unless lead.stage&.is_lost %>
+              <button type="button"
+                      data-action="leads-pipeline#toggleLostForm"
+                      class="inline-flex items-center justify-center h-9 px-4 rounded-md border border-border text-sm">
+                Mark as lost
+              </button>
+            <% end %>
+          </div>
+          <% if lead.email.blank? %>
+            <p class="text-[11px] text-fg-muted">Add an email before converting.</p>
+          <% end %>
+          <%= form_with url: mark_lost_lead_path(lead), method: :post,
+                        html: { class: "hidden flex-col gap-2 rounded-md border border-border p-2 mt-2",
+                                data: { leads_pipeline_target: "lostForm" } } do %>
+            <label class="text-xs text-fg-muted" for="lost_reason">Reason (optional)</label>
+            <%= text_field_tag :reason, nil, id: "lost_reason",
+                  placeholder: "e.g. price, timing, ghosted",
+                  class: "h-9 rounded-md border border-border bg-surface px-2 text-sm" %>
+            <div class="flex justify-end">
+              <%= submit_tag "Confirm",
+                    class: "inline-flex items-center justify-center h-9 px-4 rounded-md border border-border text-sm" %>
+            </div>
+          <% end %>
+        <% end %>
+      </section>
+    </div>
+  </div>
+</div>

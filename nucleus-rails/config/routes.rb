@@ -29,6 +29,23 @@ Rails.application.routes.draw do
 
   resources :tags, only: %i[index new create edit update destroy]
 
+  # Rs6 leads pipeline. The Kanban lives at /leads (index); individual lead
+  # ops (move / convert / mark_lost / activities) hang off the member.
+  # Stage CRUD lives under /lead_stages with a collection :reorder that
+  # the Sortable.js Stimulus controller POSTs to.
+  resources :leads, only: %i[index show create update destroy] do
+    member do
+      post :move
+      post :convert
+      post :mark_lost
+    end
+    resources :activities, only: %i[create], controller: "lead_activities"
+  end
+
+  resources :lead_stages, only: %i[create update destroy] do
+    collection { post :reorder }
+  end
+
   # /api/v1 is token-only (Api::TokenAuth). No cookies, no CSRF — the base
   # controller inherits from ActionController::API, so session middleware
   # never runs for these paths. Rs4.5 lands /me; Rs5 adds /clients; later
@@ -43,6 +60,25 @@ Rails.application.routes.draw do
         resources :tags, only: %i[create destroy], controller: "client_tags"
       end
       resources :tags, only: %i[index create]
+
+      # Rs6 leads API. The write endpoints (move/convert/mark_lost) keep
+      # their HTTP verb POST even when the state change could be framed as
+      # PUT, to match MCP tool calls 1:1 in Rs26.5. Activities ride as a
+      # member action on LeadsController (not a nested resource) so there's
+      # exactly one controller serializing LeadActivity rows.
+      resources :leads, only: %i[index show create update destroy] do
+        collection { get :pipeline }
+        member do
+          post :move
+          post :convert
+          post :mark_lost
+          get  :activities
+          post :activities, action: :add_activity
+        end
+      end
+      resources :lead_stages, only: %i[index create update destroy] do
+        collection { post :reorder }
+      end
     end
   end
 

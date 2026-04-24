@@ -36,8 +36,9 @@
         <nav class="flex-1 p-3 space-y-1 text-sm">
           <%= render "shared/nav_item", path: dashboard_path, label: "Dashboard", active: current_page?(dashboard_path) %>
           <%= render "shared/nav_item", path: clients_path,   label: "Clients",   active: controller_name == "clients" %>
+          <%= render "shared/nav_item", path: leads_path,     label: "Leads",     active: %w[leads lead_stages lead_activities].include?(controller_name) %>
           <%= render "shared/nav_item", path: tags_path,      label: "Tags",      active: controller_name == "tags" %>
-          <%# Future: leads, services, calendar — wired in Rs6+ %>
+          <%# Future: services, calendar — wired in Rs7+ %>
         </nav>
 
         <div class="p-3 border-t border-border text-xs text-fg-muted">
