@@ -7,6 +7,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  timestamp,
   unique,
   uuid,
 } from "drizzle-orm/pg-core"
@@ -36,6 +37,17 @@ export const clients = pgTable(
     dateOfBirth: date("date_of_birth"),
     locale: text("locale").default("ro").notNull(),
     metadata: jsonb("metadata"),
+    // Magic-link / ticket-based portal access tracking. `portal_invite_id` is
+    // the Clerk OrganizationInvitation id; `portal_invite_url` is the magic
+    // link the agent forwards to the client. Cleared on revoke.
+    portalInviteId: text("portal_invite_id"),
+    portalInviteUrl: text("portal_invite_url"),
+    portalInviteSentAt: timestamp("portal_invite_sent_at", {
+      withTimezone: true,
+    }),
+    portalInviteRevokedAt: timestamp("portal_invite_revoked_at", {
+      withTimezone: true,
+    }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

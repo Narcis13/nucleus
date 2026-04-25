@@ -16,6 +16,8 @@ import { captureServerEvent } from "@/lib/posthog/server"
 export type ProductEvent =
   | "professional_signed_up"
   | "client_added"
+  | "client_portal_invited"
+  | "client_portal_revoked"
   | "lead_created"
   | "lead_converted"
   | "message_sent"
@@ -40,6 +42,12 @@ type EventProps = {
     clientId: string
     invited: boolean
     source?: string | null
+  }
+  client_portal_invited: BaseProps & {
+    clientId: string
+  }
+  client_portal_revoked: BaseProps & {
+    clientId: string
   }
   lead_created: BaseProps & {
     leadId: string

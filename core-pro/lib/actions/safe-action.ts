@@ -8,6 +8,7 @@ import {
 import { headers } from "next/headers"
 import { z } from "zod"
 
+import { ServiceError } from "@/lib/services/_lib/errors"
 import { withRLS, type Tx } from "@/lib/db/rls"
 import { apiRateLimit } from "@/lib/ratelimit"
 
@@ -35,7 +36,7 @@ const baseClient = createSafeActionClient({
         error,
       )
     }
-    if (error instanceof ActionError) {
+    if (error instanceof ActionError || error instanceof ServiceError) {
       return error.message
     }
     return DEFAULT_SERVER_ERROR_MESSAGE

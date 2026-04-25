@@ -181,6 +181,105 @@ export async function inviteClient(args: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Magic-link portal invitations (Phase 0.5)
+//
+// Unlike `inviteClient` above, these helpers return the OrganizationInvitation
+// `url` directly so the agent can forward it via their own channel (email,
+// WhatsApp, SMS) instead of relying on Clerk's default invitation email. The
+// dashboard must be configured with that email disabled.
+//
+// `redirectUrl` lands the client on `/accept-invite` with `__clerk_ticket` and
+// `__clerk_status` query params — see app/accept-invite/page.tsx for the
+// ticket-handling flow.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function createPortalMagicLink(args: {
+  email: string
+  professionalId: string
+  clerkOrgId: string
+  inviterUserId?: string
+  redirectUrl: string
+}): Promise<{ invitationId: string; url: string }> {
+  const client = await clerkClient()
+  const invitation = await client.organizations.createOrganizationInvitation({
+    organizationId: args.clerkOrgId,
+    emailAddress: args.email,
+    role: "org:member",
+    inviterUserId: args.inviterUserId,
+    redirectUrl: args.redirectUrl,
+    publicMetadata: {
+      professional_id: args.professionalId,
+      role: "client",
+    },
+  })
+  return { invitationId: invitation.id, url: invitation.url ?? "" }
+}
+
+export async function revokePortalInvitation(args: {
+  invitationId: string
+  clerkOrgId: string
+  requestingUserId?: string
+}): Promise<void> {
+  const client = await clerkClient()
+  try {
+    await client.organizations.revokeOrganizationInvitation({
+      organizationId: args.clerkOrgId,
+      invitationId: args.invitationId,
+      requestingUserId: args.requestingUserId ?? "",
+    })
+  } catch (err) {
+    // Already revoked / accepted / expired — Clerk returns 4xx. Treat as a
+    // no-op so the caller's revoke-then-recreate workflow doesn't blow up.
+    if (!isAlreadyResolvedError(err)) throw err
+  }
+}
+
+// Sign the client out everywhere (active sessions) and remove them from the
+// professional's Clerk org so any cached JWT can no longer pass RLS. Best-
+// effort: each step is independent and missing-resource errors are swallowed.
+export async function revokePortalActiveAccess(args: {
+  clerkUserId: string
+  clerkOrgId: string
+}): Promise<void> {
+  const client = await clerkClient()
+
+  try {
+    const sessions = await client.sessions.getSessionList({
+      userId: args.clerkUserId,
+    })
+    const list = "data" in sessions ? sessions.data : sessions
+    await Promise.all(
+      list.map((s) =>
+        client.sessions
+          .revokeSession(s.id)
+          .catch((err: unknown) => {
+            if (!isAlreadyResolvedError(err)) throw err
+          }),
+      ),
+    )
+  } catch (err) {
+    if (!isAlreadyResolvedError(err)) throw err
+  }
+
+  try {
+    await client.organizations.deleteOrganizationMembership({
+      organizationId: args.clerkOrgId,
+      userId: args.clerkUserId,
+    })
+  } catch (err) {
+    if (!isAlreadyResolvedError(err)) throw err
+  }
+}
+
+// Clerk surfaces 404 / 403 / 422 when an invitation/session/membership has
+// already been resolved (revoked, accepted, expired). For revoke flows that
+// is not a real failure — the desired end-state already holds.
+function isAlreadyResolvedError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false
+  const status = (err as { status?: number }).status
+  return status === 404 || status === 403 || status === 422
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function resolvePrimaryEmail(user: ClerkUserPayload): string | null {

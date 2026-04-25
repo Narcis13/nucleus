@@ -16,7 +16,20 @@ const isProtectedRoute = createRouteMatcher([
   "/api/protected(.*)",
 ])
 
-const isAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"])
+// `/accept-invite` and `/portal/sign-in` are deliberately *unauthenticated*
+// landing pages — the magic-link ticket flow signs the visitor in client-side,
+// and the lost-link recovery form has to be reachable when they're signed out.
+const isPublicPortalRoute = createRouteMatcher([
+  "/accept-invite(.*)",
+  "/portal/sign-in(.*)",
+])
+
+const isAuthRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/accept-invite(.*)",
+  "/portal/sign-in(.*)",
+])
 const isWebhookRoute = createRouteMatcher(["/api/webhooks(.*)"])
 const isApiRoute = createRouteMatcher(["/api(.*)"])
 
@@ -66,7 +79,7 @@ export default clerkMiddleware(async (auth, req) => {
   const limited = await enforceRateLimit(req)
   if (limited) return limited
 
-  if (isProtectedRoute(req)) {
+  if (isProtectedRoute(req) && !isPublicPortalRoute(req)) {
     await auth.protect()
   }
 })

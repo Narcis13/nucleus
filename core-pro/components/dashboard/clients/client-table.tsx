@@ -4,12 +4,17 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpDown,
+  Check,
+  Copy,
   Download,
   Filter,
+  KeyRound,
   MessageSquare,
   MoreHorizontal,
   Plus,
+  RefreshCw,
   Search,
+  ShieldOff,
   Tag as TagIcon,
   X,
 } from "lucide-react"
@@ -62,9 +67,19 @@ import {
   archiveClientAction,
   bulkAddTagAction,
   exportClientsAction,
+  inviteClientToPortalAction,
+  resendClientPortalInviteAction,
+  revokeClientPortalAccessAction,
 } from "@/lib/actions/clients"
 import { getOrCreateConversationAction } from "@/lib/actions/messages"
+import {
+  PORTAL_STATUS_BADGE,
+  PORTAL_STATUS_LABEL,
+  getPortalAccessStatus,
+  type PortalAccessStatus,
+} from "@/lib/clients/portal-status"
 import type { ClientListItem } from "@/lib/db/queries/clients"
+import { cn } from "@/lib/utils"
 import type { Tag } from "@/types/domain"
 
 import { ClientForm } from "./client-form"
@@ -321,6 +336,7 @@ export function ClientTable({
                   onClick={() => toggleSort("status")}
                 />
               </TableHead>
+              <TableHead>Portal</TableHead>
               <TableHead>
                 <SortHeader
                   label="Added"
@@ -336,7 +352,7 @@ export function ClientTable({
             {rows.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   No clients match those filters.
@@ -406,6 +422,9 @@ export function ClientTable({
                       {row.relationship.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <PortalStatusBadge client={row.client} />
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {row.relationship.createdAt.toLocaleDateString()}
                   </TableCell>
@@ -421,43 +440,11 @@ export function ClientTable({
                       >
                         <MessageSquare className="size-3.5" />
                       </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Row actions"
-                            />
-                          }
-                        >
-                          <MoreHorizontal className="size-3.5" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            render={
-                              <Link href={`/dashboard/clients/${row.client.id}`} />
-                            }
-                          >
-                            View profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openConversation(row.client.id)}
-                          >
-                            <MessageSquare className="size-3.5" />
-                            Message
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() =>
-                              archiveAction.execute({ id: row.client.id })
-                            }
-                          >
-                            Archive
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <RowActionsMenu
+                        client={row.client}
+                        openConversation={openConversation}
+                        archive={(id) => archiveAction.execute({ id })}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -557,6 +544,180 @@ function TagFilterPopover({
         </div>
       </PopoverContent>
     </Popover>
+  )
+}
+
+function PortalStatusBadge({
+  client,
+}: {
+  client: ClientListItem["client"]
+}) {
+  const status = getPortalAccessStatus(client)
+  return (
+    <Badge
+      variant="outline"
+      className={cn("text-[10px]", PORTAL_STATUS_BADGE[status].className)}
+    >
+      {PORTAL_STATUS_LABEL[status]}
+    </Badge>
+  )
+}
+
+function RowActionsMenu({
+  client,
+  openConversation,
+  archive,
+}: {
+  client: ClientListItem["client"]
+  openConversation: (id: string) => void
+  archive: (id: string) => void
+}) {
+  const router = useRouter()
+  const status = getPortalAccessStatus(client)
+  const [copied, setCopied] = useState(false)
+
+  const copyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      toast.success("Portal link copied.")
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast.error("Couldn't copy — try long-pressing the link instead.")
+    }
+  }
+
+  const inviteAction = useAction(inviteClientToPortalAction, {
+    onSuccess: ({ data }) => {
+      if (data?.url) void copyUrl(data.url)
+      router.refresh()
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError ?? "Couldn't send portal invite.")
+    },
+  })
+
+  const resendAction = useAction(resendClientPortalInviteAction, {
+    onSuccess: ({ data }) => {
+      if (data?.url) void copyUrl(data.url)
+      router.refresh()
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError ?? "Couldn't resend portal invite.")
+    },
+  })
+
+  const revokeAction = useAction(revokeClientPortalAccessAction, {
+    onSuccess: () => {
+      toast.success("Portal access revoked.")
+      router.refresh()
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError ?? "Couldn't revoke access.")
+    },
+  })
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Row actions" />
+        }
+      >
+        <MoreHorizontal className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          render={<Link href={`/dashboard/clients/${client.id}`} />}
+        >
+          View profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openConversation(client.id)}>
+          <MessageSquare className="size-3.5" />
+          Message
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <PortalActionItems
+          status={status}
+          inviteUrl={client.portalInviteUrl}
+          copied={copied}
+          onSend={() => inviteAction.execute({ clientId: client.id })}
+          onResend={() => resendAction.execute({ clientId: client.id })}
+          onRevoke={() => revokeAction.execute({ clientId: client.id })}
+          onCopy={() =>
+            client.portalInviteUrl && void copyUrl(client.portalInviteUrl)
+          }
+          busy={
+            inviteAction.isPending ||
+            resendAction.isPending ||
+            revokeAction.isPending
+          }
+        />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => archive(client.id)}
+        >
+          Archive
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function PortalActionItems({
+  status,
+  inviteUrl,
+  copied,
+  onSend,
+  onResend,
+  onRevoke,
+  onCopy,
+  busy,
+}: {
+  status: PortalAccessStatus
+  inviteUrl: string | null | undefined
+  copied: boolean
+  onSend: () => void
+  onResend: () => void
+  onRevoke: () => void
+  onCopy: () => void
+  busy: boolean
+}) {
+  if (status === "not_invited" || status === "revoked") {
+    return (
+      <DropdownMenuItem onClick={onSend} disabled={busy}>
+        <KeyRound className="size-3.5" />
+        Send portal access
+      </DropdownMenuItem>
+    )
+  }
+  // invited or active — show copy / resend / revoke
+  return (
+    <>
+      {inviteUrl && (
+        <DropdownMenuItem onClick={onCopy} disabled={busy}>
+          {copied ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Copy className="size-3.5" />
+          )}
+          {copied ? "Copied" : "Copy portal link"}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem onClick={onResend} disabled={busy}>
+        <RefreshCw className="size-3.5" />
+        Resend link
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        variant="destructive"
+        onClick={onRevoke}
+        disabled={busy}
+      >
+        <ShieldOff className="size-3.5" />
+        Revoke access
+      </DropdownMenuItem>
+    </>
   )
 }
 
