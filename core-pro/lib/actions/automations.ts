@@ -3,20 +3,13 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { ActionError, authedAction } from "@/lib/actions/safe-action"
-import { getProfessional } from "@/lib/db/queries/professionals"
-import { trackServerEvent } from "@/lib/posthog/events"
-import {
-  createAutomation as createAutomationQuery,
-  deleteAutomation as deleteAutomationQuery,
-  getAutomation,
-  setAutomationActive,
-  updateAutomation as updateAutomationQuery,
-} from "@/lib/db/queries/automations"
-import {
-  evaluateTrigger,
-  processAutomationChain,
-} from "@/lib/automations/engine"
+import { authedAction } from "@/lib/actions/safe-action"
+import { createAutomation } from "@/lib/services/automations/create"
+import { deleteAutomation } from "@/lib/services/automations/delete"
+import { runAutomationNow } from "@/lib/services/automations/run-now"
+import { simulateTrigger } from "@/lib/services/automations/simulate-trigger"
+import { toggleAutomation } from "@/lib/services/automations/toggle"
+import { updateAutomation } from "@/lib/services/automations/update"
 import { TRIGGER_TYPES } from "@/lib/automations/types"
 import type {
   AutomationAction,
@@ -112,73 +105,62 @@ const runNowSchema = z.object({
   targetId: z.string().uuid().nullable().optional(),
 })
 
+const simulateSchema = z.object({
+  type: z.enum(TRIGGER_TYPES),
+  payload: z.record(z.string(), z.unknown()),
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Actions
 // ─────────────────────────────────────────────────────────────────────────────
 export const createAutomationAction = authedAction
   .metadata({ actionName: "automations.create" })
   .inputSchema(createSchema)
-  .action(async ({ parsedInput }) => {
-    const row = await createAutomationQuery({
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await createAutomation(ctx, {
       name: parsedInput.name,
       triggerType: parsedInput.triggerType as TriggerType,
       triggerConfig: (parsedInput.triggerConfig ?? {}) as TriggerConfig,
       actions: parsedInput.actions as AutomationAction[],
       isActive: parsedInput.isActive,
     })
-
-    const professional = await getProfessional()
-    if (professional) {
-      void trackServerEvent("automation_created", {
-        distinctId: professional.clerkUserId,
-        professionalId: professional.id,
-        plan: professional.plan,
-        automationId: row.id,
-        triggerType: parsedInput.triggerType,
-      })
-    }
-
     revalidatePath("/dashboard/automations")
-    return { id: row.id }
+    return result
   })
 
 export const updateAutomationAction = authedAction
   .metadata({ actionName: "automations.update" })
   .inputSchema(updateSchema)
-  .action(async ({ parsedInput }) => {
-    const { id, ...rest } = parsedInput
-    const patch: Record<string, unknown> = {}
-    if (rest.name !== undefined) patch.name = rest.name
-    if (rest.triggerType !== undefined) patch.triggerType = rest.triggerType
-    if (rest.triggerConfig !== undefined)
-      patch.triggerConfig = rest.triggerConfig
-    if (rest.actions !== undefined) patch.actions = rest.actions
-    if (rest.isActive !== undefined) patch.isActive = rest.isActive
-    const row = await updateAutomationQuery(id, patch)
-    if (!row) throw new ActionError("Automation not found.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateAutomation(ctx, {
+      id: parsedInput.id,
+      name: parsedInput.name,
+      triggerType: parsedInput.triggerType as TriggerType | undefined,
+      triggerConfig: parsedInput.triggerConfig as TriggerConfig | undefined,
+      actions: parsedInput.actions as AutomationAction[] | undefined,
+      isActive: parsedInput.isActive,
+    })
     revalidatePath("/dashboard/automations")
-    revalidatePath(`/dashboard/automations/${id}`)
-    return { id: row.id }
+    revalidatePath(`/dashboard/automations/${parsedInput.id}`)
+    return result
   })
 
 export const deleteAutomationAction = authedAction
   .metadata({ actionName: "automations.delete" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const ok = await deleteAutomationQuery(parsedInput.id)
-    if (!ok) throw new ActionError("Automation not found.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await deleteAutomation(ctx, parsedInput)
     revalidatePath("/dashboard/automations")
-    return { ok: true }
+    return result
   })
 
 export const toggleAutomationAction = authedAction
   .metadata({ actionName: "automations.toggle" })
   .inputSchema(toggleSchema)
-  .action(async ({ parsedInput }) => {
-    const row = await setAutomationActive(parsedInput.id, parsedInput.isActive)
-    if (!row) throw new ActionError("Automation not found.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await toggleAutomation(ctx, parsedInput)
     revalidatePath("/dashboard/automations")
-    return { id: row.id, isActive: row.isActive }
+    return result
   })
 
 // "Run now" — executes the action chain against an ad-hoc target (e.g. a
@@ -188,12 +170,10 @@ export const toggleAutomationAction = authedAction
 export const runAutomationNowAction = authedAction
   .metadata({ actionName: "automations.runNow" })
   .inputSchema(runNowSchema)
-  .action(async ({ parsedInput }) => {
-    const row = await getAutomation(parsedInput.id)
-    if (!row) throw new ActionError("Automation not found.")
-    await processAutomationChain(row.id, parsedInput.targetId ?? null)
-    revalidatePath(`/dashboard/automations/${row.id}`)
-    return { ok: true }
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await runAutomationNow(ctx, parsedInput)
+    revalidatePath(`/dashboard/automations/${parsedInput.id}`)
+    return result
   })
 
 // Re-exported for the evaluation surface of Session-18 verification. Lets the
@@ -201,37 +181,9 @@ export const runAutomationNowAction = authedAction
 // chain fire end-to-end.
 export const simulateTriggerAction = authedAction
   .metadata({ actionName: "automations.simulateTrigger" })
-  .inputSchema(
-    z.object({
-      type: z.enum(TRIGGER_TYPES),
-      payload: z.record(z.string(), z.unknown()),
-    }),
-  )
+  .inputSchema(simulateSchema)
   .action(async ({ ctx, parsedInput }) => {
-    // The payload includes the professionalId; we force it to the current
-    // user to prevent cross-tenant simulation.
-    const payload = {
-      ...parsedInput.payload,
-      type: parsedInput.type,
-      professionalId: ctx.userId, // will be replaced by lookup below
-    } as { type: TriggerType; professionalId: string } & Record<string, unknown>
-
-    // Resolve the calling user's professional id. ctx.userId is the Clerk
-    // sub, not a row id — evaluateTrigger expects the latter.
-    const { dbAdmin } = await import("@/lib/db/client")
-    const { professionals } = await import("@/lib/db/schema")
-    const { eq } = await import("drizzle-orm")
-    const [pro] = await dbAdmin
-      .select({ id: professionals.id })
-      .from(professionals)
-      .where(eq(professionals.clerkUserId, ctx.userId))
-      .limit(1)
-    if (!pro) throw new ActionError("Professional not found.")
-    payload.professionalId = pro.id
-
-    // Narrow type for the engine — caller knows which shape matches.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await evaluateTrigger(parsedInput.type, payload as any)
+    const result = await simulateTrigger(ctx, parsedInput)
     revalidatePath(`/dashboard/automations`)
     return result
   })

@@ -3,28 +3,18 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import {
-  ActionError,
-  authedAction,
-} from "@/lib/actions/safe-action"
-import { evaluateTrigger } from "@/lib/automations/engine"
-import {
-  addLeadActivity as addLeadActivityQuery,
-  convertLeadToClient as convertLeadToClientQuery,
-  createLead as createLeadQuery,
-  createStage as createStageQuery,
-  deleteStage as deleteStageQuery,
-  ensureDefaultStages,
-  getLead as getLeadQuery,
-  getStages,
-  markLeadLost as markLeadLostQuery,
-  moveLeadToStage as moveLeadToStageQuery,
-  reorderStages as reorderStagesQuery,
-  updateLead as updateLeadQuery,
-  updateStage as updateStageQuery,
-} from "@/lib/db/queries/leads"
-import { getProfessional } from "@/lib/db/queries/professionals"
-import { trackServerEvent } from "@/lib/posthog/events"
+import { authedAction } from "@/lib/actions/safe-action"
+import { addLeadActivity } from "@/lib/services/leads/add-activity"
+import { convertLeadToClient } from "@/lib/services/leads/convert-to-client"
+import { createLead } from "@/lib/services/leads/create"
+import { createStage } from "@/lib/services/leads/create-stage"
+import { deleteStage } from "@/lib/services/leads/delete-stage"
+import { ensureDefaultStages } from "@/lib/services/leads/ensure-default-stages"
+import { markLeadLost } from "@/lib/services/leads/mark-lost"
+import { moveLeadToStage } from "@/lib/services/leads/move-to-stage"
+import { reorderStages } from "@/lib/services/leads/reorder-stages"
+import { updateLead } from "@/lib/services/leads/update"
+import { updateStage } from "@/lib/services/leads/update-stage"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemas
@@ -104,130 +94,54 @@ const reorderStagesSchema = z.object({
 export const createLeadAction = authedAction
   .metadata({ actionName: "leads.create" })
   .inputSchema(createLeadSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) {
-      throw new ActionError("Complete onboarding before adding leads.")
-    }
-
-    // The board page seeds defaults on first load, but if a lead is created
-    // through some other surface we still need a stage to land on.
-    const stages = await ensureDefaultStages()
-    const stageId =
-      parsedInput.stageId ?? stages[0]?.id
-    if (!stageId) {
-      throw new ActionError("No pipeline stages available.")
-    }
-
-    const created = await createLeadQuery({
-      professionalId: professional.id,
-      stageId,
-      fullName: parsedInput.fullName,
-      email: parsedInput.email || null,
-      phone: parsedInput.phone || null,
-      source: parsedInput.source || null,
-    })
-
-    // Fire automations keyed on `new_lead` — best-effort, never blocks the
-    // authoring response if Trigger.dev / the engine chokes.
-    void evaluateTrigger("new_lead", {
-      type: "new_lead",
-      professionalId: professional.id,
-      leadId: created.id,
-    }).catch(() => {})
-
-    void trackServerEvent("lead_created", {
-      distinctId: professional.clerkUserId,
-      professionalId: professional.id,
-      plan: professional.plan,
-      leadId: created.id,
-      source: parsedInput.source || null,
-    })
-
-    return { lead: created }
+  .action(async ({ parsedInput, ctx }) => {
+    return createLead(ctx, parsedInput)
   })
 
 export const updateLeadAction = authedAction
   .metadata({ actionName: "leads.update" })
   .inputSchema(updateLeadSchema)
-  .action(async ({ parsedInput }) => {
-    const { id, ...rest } = parsedInput
-    const patch: Record<string, unknown> = {}
-    if (rest.fullName !== undefined) patch.fullName = rest.fullName
-    if (rest.email !== undefined) patch.email = rest.email || null
-    if (rest.phone !== undefined) patch.phone = rest.phone || null
-    if (rest.source !== undefined) patch.source = rest.source || null
-    if (rest.score !== undefined) patch.score = rest.score
-    if (rest.notes !== undefined) patch.notes = rest.notes
-    const updated = await updateLeadQuery(id, patch)
-    if (!updated) throw new ActionError("Lead not found.")
-    return { lead: updated }
+  .action(async ({ parsedInput, ctx }) => {
+    return updateLead(ctx, parsedInput)
   })
 
 export const moveLeadToStageAction = authedAction
   .metadata({ actionName: "leads.move" })
   .inputSchema(moveLeadSchema)
-  .action(async ({ parsedInput }) => {
-    const updated = await moveLeadToStageQuery(
-      parsedInput.leadId,
-      parsedInput.stageId,
-    )
-    if (!updated) throw new ActionError("Lead not found.")
+  .action(async ({ parsedInput, ctx }) => {
     // NOTE: deliberately no `revalidatePath` here. The kanban UI is updated
     // optimistically on the client; a rapid move → move-back would otherwise
     // stream two RSC payloads back-to-back and trip a Next 16 chunk-map race
     // (`initializeDebugInfo` / `enqueueModel` crashes). Other lead actions
     // still revalidate — on the next navigation the timeline picks up the
     // new `stage_changed` activity row this move wrote.
-    return { id: updated.id, stageId: updated.stageId }
+    return moveLeadToStage(ctx, parsedInput)
   })
 
 export const addLeadActivityAction = authedAction
   .metadata({ actionName: "leads.addActivity" })
   .inputSchema(addActivitySchema)
-  .action(async ({ parsedInput }) => {
-    const activity = await addLeadActivityQuery({
-      leadId: parsedInput.leadId,
-      type: parsedInput.type,
-      description: parsedInput.description,
-    })
-    return { activity }
+  .action(async ({ parsedInput, ctx }) => {
+    return addLeadActivity(ctx, parsedInput)
   })
 
 export const convertLeadToClientAction = authedAction
   .metadata({ actionName: "leads.convert" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    const result = await convertLeadToClientQuery(parsedInput.id)
-    if (!result) throw new ActionError("Lead not found.")
-    if (professional) {
-      void trackServerEvent("lead_converted", {
-        distinctId: professional.clerkUserId,
-        professionalId: professional.id,
-        plan: professional.plan,
-        leadId: result.leadId,
-        clientId: result.clientId,
-      })
-    }
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await convertLeadToClient(ctx, parsedInput)
     // The user is navigated to the client profile after this; refresh the
     // clients list so the new row appears there. The leads page uses local
     // state for optimistic updates, so no leads revalidate here.
     revalidatePath("/dashboard/clients")
-    const updatedLead = await getLeadQuery(result.leadId)
-    return { ...result, lead: updatedLead }
+    return result
   })
 
 export const markLeadLostAction = authedAction
   .metadata({ actionName: "leads.markLost" })
   .inputSchema(markLostSchema)
-  .action(async ({ parsedInput }) => {
-    const updated = await markLeadLostQuery(
-      parsedInput.leadId,
-      parsedInput.reason,
-    )
-    if (!updated) throw new ActionError("Lead not found.")
-    return { lead: updated }
+  .action(async ({ parsedInput, ctx }) => {
+    return markLeadLost(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -236,53 +150,34 @@ export const markLeadLostAction = authedAction
 export const ensureDefaultStagesAction = authedAction
   .metadata({ actionName: "leads.ensureStages" })
   .inputSchema(z.object({}))
-  .action(async () => {
-    const stages = await ensureDefaultStages()
-    return { count: stages.length }
+  .action(async ({ parsedInput, ctx }) => {
+    return ensureDefaultStages(ctx, parsedInput)
   })
 
 export const createStageAction = authedAction
   .metadata({ actionName: "leads.createStage" })
   .inputSchema(stageInputSchema)
-  .action(async ({ parsedInput }) => {
-    const created = await createStageQuery({
-      name: parsedInput.name,
-      color: parsedInput.color,
-      isWon: parsedInput.isWon ?? false,
-      isLost: parsedInput.isLost ?? false,
-    })
-    return { stage: created }
+  .action(async ({ parsedInput, ctx }) => {
+    return createStage(ctx, parsedInput)
   })
 
 export const updateStageAction = authedAction
   .metadata({ actionName: "leads.updateStage" })
   .inputSchema(stageUpdateSchema)
-  .action(async ({ parsedInput }) => {
-    const { id, ...rest } = parsedInput
-    const updated = await updateStageQuery(id, rest)
-    if (!updated) throw new ActionError("Stage not found.")
-    return { stage: updated }
+  .action(async ({ parsedInput, ctx }) => {
+    return updateStage(ctx, parsedInput)
   })
 
 export const reorderStagesAction = authedAction
   .metadata({ actionName: "leads.reorderStages" })
   .inputSchema(reorderStagesSchema)
-  .action(async ({ parsedInput }) => {
-    await reorderStagesQuery(parsedInput.ordered)
-    return { ok: true }
+  .action(async ({ parsedInput, ctx }) => {
+    return reorderStages(ctx, parsedInput)
   })
 
 export const deleteStageAction = authedAction
   .metadata({ actionName: "leads.deleteStage" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const stages = await getStages()
-    if (stages.length <= 1) {
-      throw new ActionError("Keep at least one stage.")
-    }
-    const result = await deleteStageQuery(parsedInput.id)
-    if (!result.deleted) {
-      throw new ActionError(result.reason ?? "Couldn't delete stage.")
-    }
-    return { id: parsedInput.id }
+  .action(async ({ parsedInput, ctx }) => {
+    return deleteStage(ctx, parsedInput)
   })

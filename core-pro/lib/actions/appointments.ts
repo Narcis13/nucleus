@@ -24,21 +24,14 @@ import {
   authedAction,
   publicAction,
 } from "@/lib/actions/safe-action"
-import {
-  cancelAppointment as cancelAppointmentQuery,
-  createAppointment as createAppointmentQuery,
-  createPublicBooking,
-  getAppointment,
-  getAvailableSlotsPublic,
-  replaceAvailability,
-  setCalendarBufferMinutes,
-  updateAppointment as updateAppointmentQuery,
-} from "@/lib/db/queries/appointments"
-import { getProfessional } from "@/lib/db/queries/professionals"
-import { evaluateTrigger } from "@/lib/automations/engine"
-import { trackServerEvent } from "@/lib/posthog/events"
 import { publicFormRateLimit } from "@/lib/ratelimit"
-import { sendAppointmentEmails, scheduleAppointmentReminders } from "@/lib/scheduling/notifications"
+import { cancelAppointment } from "@/lib/services/appointments/cancel"
+import { createAppointment } from "@/lib/services/appointments/create"
+import { createBooking } from "@/lib/services/appointments/create-booking"
+import { getAvailableSlots } from "@/lib/services/appointments/get-available-slots"
+import { rescheduleAppointment } from "@/lib/services/appointments/reschedule"
+import { saveAvailability } from "@/lib/services/appointments/save-availability"
+import { updateAppointment } from "@/lib/services/appointments/update"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemas
@@ -123,79 +116,15 @@ const slotsQuerySchema = z.object({
 export const createAppointmentAction = authedAction
   .metadata({ actionName: "appointments.create" })
   .inputSchema(createSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    const startAt = new Date(parsedInput.startAt)
-    const endAt = new Date(parsedInput.endAt)
-    if (endAt <= startAt) {
-      throw new ActionError("End time must be after start time.")
-    }
-
-    const created = await createAppointmentQuery(
-      {
-        clientId: parsedInput.clientId ?? null,
-        serviceId: parsedInput.serviceId ?? null,
-        title: parsedInput.title,
-        description: parsedInput.description ?? null,
-        startAt,
-        endAt,
-        type: parsedInput.type,
-        status: parsedInput.status,
-        location: parsedInput.location ?? null,
-        notes: parsedInput.notes ?? null,
-      },
-      professional.id,
-    )
-
-    // Best-effort: send confirmation email + schedule reminders. We don't
-    // fail the action if Resend / Trigger.dev is unreachable — the appointment
-    // is the source of truth and cron-style backfill can re-send later.
-    void sendAppointmentEmails({
-      appointmentId: created.id,
-      kind: "confirmation",
-    }).catch(() => {})
-    void scheduleAppointmentReminders(created.id).catch(() => {})
-
-    void trackServerEvent("appointment_created", {
-      distinctId: professional.clerkUserId,
-      professionalId: professional.id,
-      plan: professional.plan,
-      appointmentId: created.id,
-      origin: "professional",
-      type: parsedInput.type,
-    })
-
-    return { appointment: created }
+  .action(async ({ parsedInput, ctx }) => {
+    return createAppointment(ctx, parsedInput)
   })
 
 export const updateAppointmentAction = authedAction
   .metadata({ actionName: "appointments.update" })
   .inputSchema(updateSchema)
-  .action(async ({ parsedInput }) => {
-    const { id, startAt, endAt, ...rest } = parsedInput
-    const patch: Record<string, unknown> = { ...rest }
-    if (startAt) patch.startAt = new Date(startAt)
-    if (endAt) patch.endAt = new Date(endAt)
-
-    const updated = await updateAppointmentQuery(id, patch as never)
-    if (!updated) throw new ActionError("Appointment not found.")
-
-    if (startAt || endAt) {
-      void scheduleAppointmentReminders(id).catch(() => {})
-    }
-
-    if (parsedInput.status === "completed") {
-      void evaluateTrigger("appointment_completed", {
-        type: "appointment_completed",
-        professionalId: updated.professionalId,
-        clientId: updated.clientId ?? null,
-        appointmentId: updated.id,
-      }).catch(() => {})
-    }
-
-    return { appointment: updated }
+  .action(async ({ parsedInput, ctx }) => {
+    return updateAppointment(ctx, parsedInput)
   })
 
 // Drag-to-reschedule on the calendar. Deliberately skips `revalidatePath` —
@@ -206,76 +135,25 @@ export const updateAppointmentAction = authedAction
 export const rescheduleAppointmentAction = authedAction
   .metadata({ actionName: "appointments.reschedule" })
   .inputSchema(rescheduleSchema)
-  .action(async ({ parsedInput }) => {
-    const startAt = new Date(parsedInput.startAt)
-    const endAt = new Date(parsedInput.endAt)
-    if (endAt <= startAt) {
-      throw new ActionError("End time must be after start time.")
-    }
-
-    const existing = await getAppointment(parsedInput.id)
-    if (!existing) throw new ActionError("Appointment not found.")
-    if (existing.appointment.status === "cancelled") {
-      throw new ActionError("Cancelled appointments can't be rescheduled.")
-    }
-
-    const updated = await updateAppointmentQuery(parsedInput.id, {
-      startAt,
-      endAt,
-    } as never)
-    if (!updated) throw new ActionError("Appointment not found.")
-
-    void scheduleAppointmentReminders(parsedInput.id).catch(() => {})
-
-    return { id: updated.id }
+  .action(async ({ parsedInput, ctx }) => {
+    return rescheduleAppointment(ctx, parsedInput)
   })
 
 export const cancelAppointmentAction = authedAction
   .metadata({ actionName: "appointments.cancel" })
   .inputSchema(cancelSchema)
-  .action(async ({ parsedInput }) => {
-    const cancelled = await cancelAppointmentQuery(parsedInput.id, parsedInput.reason)
-    if (!cancelled) throw new ActionError("Appointment not found.")
-    void sendAppointmentEmails({
-      appointmentId: parsedInput.id,
-      kind: "cancellation",
-    }).catch(() => {})
-    return { appointment: cancelled }
+  .action(async ({ parsedInput, ctx }) => {
+    return cancelAppointment(ctx, parsedInput)
   })
 
 export const saveAvailabilityAction = authedAction
   .metadata({ actionName: "appointments.saveAvailability" })
   .inputSchema(availabilitySchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    // Reject overlapping windows on the same day so the slot generator never
-    // double-counts a working hour.
-    const byDay = new Map<number, Array<{ start: string; end: string }>>()
-    for (const s of parsedInput.slots) {
-      if (s.endTime <= s.startTime) {
-        throw new ActionError("End time must be after start time.")
-      }
-      const list = byDay.get(s.dayOfWeek) ?? []
-      list.push({ start: s.startTime, end: s.endTime })
-      byDay.set(s.dayOfWeek, list)
-    }
-    for (const [, list] of byDay) {
-      list.sort((a, b) => (a.start < b.start ? -1 : 1))
-      for (let i = 1; i < list.length; i++) {
-        if (list[i]!.start < list[i - 1]!.end) {
-          throw new ActionError("Availability windows must not overlap.")
-        }
-      }
-    }
-
-    await replaceAvailability(professional.id, parsedInput.slots)
-    await setCalendarBufferMinutes(professional.id, parsedInput.bufferMinutes)
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await saveAvailability(ctx, parsedInput)
     revalidatePath("/dashboard/calendar")
     revalidatePath("/dashboard/settings")
-    return { ok: true }
+    return result
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,21 +164,7 @@ export const getAvailableSlotsAction = publicAction
   .metadata({ actionName: "appointments.availableSlots" })
   .inputSchema(slotsQuerySchema)
   .action(async ({ parsedInput }) => {
-    const slots = await getAvailableSlotsPublic({
-      professionalId: parsedInput.professionalId,
-      from: new Date(parsedInput.from),
-      to: new Date(parsedInput.to),
-      slotMinutes: parsedInput.slotMinutes,
-    })
-    // Stringify dates for the wire so the client can hydrate them with a
-    // known shape (RSC + server actions both handle Date, but the booking
-    // widget might be called from outside a Next route).
-    return {
-      slots: slots.map((s) => ({
-        start: s.start.toISOString(),
-        end: s.end.toISOString(),
-      })),
-    }
+    return getAvailableSlots(parsedInput)
   })
 
 export const createBookingAction = publicAction
@@ -323,34 +187,5 @@ export const createBookingAction = publicAction
       }
     }
 
-    const startAt = new Date(parsedInput.startAt)
-    const endAt = new Date(parsedInput.endAt)
-    if (endAt <= startAt) {
-      throw new ActionError("End time must be after start time.")
-    }
-    const created = await createPublicBooking({
-      professionalId: parsedInput.professionalId,
-      serviceId: parsedInput.serviceId ?? null,
-      startAt,
-      endAt,
-      guestName: parsedInput.guestName,
-      guestEmail: parsedInput.guestEmail,
-      guestPhone: parsedInput.guestPhone ?? null,
-      notes: parsedInput.notes ?? null,
-    })
-    void sendAppointmentEmails({
-      appointmentId: created.id,
-      kind: "confirmation",
-    }).catch(() => {})
-
-    // Public bookings have no Clerk session to anchor the event to — use the
-    // professional's id as the distinct id so the funnel aggregates per pro.
-    void trackServerEvent("appointment_created", {
-      distinctId: parsedInput.professionalId,
-      professionalId: parsedInput.professionalId,
-      appointmentId: created.id,
-      origin: "public_booking",
-      type: "in_person",
-    })
-    return { id: created.id }
+    return createBooking(parsedInput)
   })

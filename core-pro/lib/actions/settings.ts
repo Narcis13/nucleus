@@ -1,32 +1,21 @@
 "use server"
 
-import { clerkClient } from "@clerk/nextjs/server"
-import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { ActionError, authedAction } from "@/lib/actions/safe-action"
-import { getCurrentProfessionalId } from "@/lib/clerk/helpers"
-import { dbAdmin } from "@/lib/db/client"
-import { withRLS } from "@/lib/db/rls"
-import {
-  clientSettings,
-  clients,
-  professionalClients,
-  professionalSettings,
-} from "@/lib/db/schema"
-import {
-  getProfessional,
-  updateProfessional,
-} from "@/lib/db/queries/professionals"
-import { getPlan, planAtLeast } from "@/lib/stripe/plans"
-import type {
-  Branding,
-  CalendarSync,
-  ConsentRecord,
-  GdprSettings,
-  IntegrationsConfig,
-} from "@/types/domain"
+import { authedAction } from "@/lib/actions/safe-action"
+import { deleteAccount } from "@/lib/services/settings/delete-account"
+import { inviteTeamMember } from "@/lib/services/settings/invite-team-member"
+import { prepareAvatarUpload } from "@/lib/services/settings/prepare-avatar-upload"
+import { prepareLogoUpload } from "@/lib/services/settings/prepare-logo-upload"
+import { removeTeamMember } from "@/lib/services/settings/remove-team-member"
+import { setAvatarUrl } from "@/lib/services/settings/set-avatar-url"
+import { updateBranding } from "@/lib/services/settings/update-branding"
+import { updateCalendarSync } from "@/lib/services/settings/update-calendar-sync"
+import { updateClientConsent } from "@/lib/services/settings/update-client-consent"
+import { updateGdprSettings } from "@/lib/services/settings/update-gdpr-settings"
+import { updateIntegrations } from "@/lib/services/settings/update-integrations"
+import { updateProfile } from "@/lib/services/settings/update-profile"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings actions — profile, branding, calendar, integrations, GDPR, team,
@@ -34,9 +23,6 @@ import type {
 // across a dozen files) because they mutate the same small set of rows and
 // share identical auth/ratelimit/revalidate shapes.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const AVATAR_BUCKET = "avatars"
-const BRANDING_LOGO_BUCKET = "marketing"
 
 // Every setting-change touches multiple surfaces — the dashboard shell, portal,
 // and any published micro-site. Revalidate the common ones in one helper so no
@@ -64,16 +50,11 @@ const profileSchema = z.object({
 export const updateProfileAction = authedAction
   .metadata({ actionName: "settings.updateProfile" })
   .inputSchema(profileSchema)
-  .action(async ({ parsedInput }) => {
-    // Drizzle doesn't strip undefined keys before building the SET clause
-    // (it literally SETs them to NULL), so we drop them ourselves.
-    const patch = cleanUndefined(parsedInput)
-    const updated = await updateProfessional(patch)
-    if (!updated) throw new ActionError("Couldn't update profile")
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateProfile(ctx, parsedInput)
     revalidateSettingsSurfaces()
     revalidatePath("/dashboard/settings/profile")
-    return { professional: updated }
+    return result
   })
 
 const prepareAvatarUploadSchema = z.object({
@@ -91,13 +72,8 @@ const prepareAvatarUploadSchema = z.object({
 export const prepareAvatarUploadAction = authedAction
   .metadata({ actionName: "settings.prepareAvatarUpload" })
   .inputSchema(prepareAvatarUploadSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-    const extMatch = parsedInput.filename.match(/\.([a-z0-9]+)$/i)
-    const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : ""
-    const storageKey = `${professional.id}/avatar-${crypto.randomUUID()}${ext}`
-    return { storageKey, bucket: AVATAR_BUCKET }
+  .action(async ({ parsedInput, ctx }) => {
+    return prepareAvatarUpload(ctx, parsedInput)
   })
 
 // Swap the avatarUrl on the professional row. Called after the browser uploads
@@ -105,12 +81,11 @@ export const prepareAvatarUploadAction = authedAction
 export const setAvatarUrlAction = authedAction
   .metadata({ actionName: "settings.setAvatarUrl" })
   .inputSchema(z.object({ avatarUrl: z.string().url().nullable() }))
-  .action(async ({ parsedInput }) => {
-    const updated = await updateProfessional({ avatarUrl: parsedInput.avatarUrl })
-    if (!updated) throw new ActionError("Couldn't save avatar")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await setAvatarUrl(ctx, parsedInput)
     revalidateSettingsSurfaces()
     revalidatePath("/dashboard/settings/profile")
-    return { avatarUrl: updated.avatarUrl }
+    return result
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,25 +107,11 @@ const brandingSchema = z.object({
 export const updateBrandingAction = authedAction
   .metadata({ actionName: "settings.updateBranding" })
   .inputSchema(brandingSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    // Custom branding is a Pro-plan feature. Still let Starter/Growth users
-    // edit — we just won't persist logos. Colour swaps are fine on every tier
-    // so they can preview, but we gate anything that would use the marketing
-    // bucket at the storage policy layer too.
-    const nextBranding: Branding = {
-      ...(professional.branding as Branding | null),
-      ...cleanUndefined(parsedInput),
-    }
-
-    const updated = await updateProfessional({ branding: nextBranding })
-    if (!updated) throw new ActionError("Couldn't save branding")
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateBranding(ctx, parsedInput)
     revalidateSettingsSurfaces()
     revalidatePath("/dashboard/settings/branding")
-    return { branding: nextBranding }
+    return result
   })
 
 const prepareLogoUploadSchema = z.object({
@@ -166,17 +127,8 @@ const prepareLogoUploadSchema = z.object({
 export const prepareLogoUploadAction = authedAction
   .metadata({ actionName: "settings.prepareLogoUpload" })
   .inputSchema(prepareLogoUploadSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-    const plan = getPlan(professional.plan)
-    if (!planAtLeast(plan.id, "growth")) {
-      throw new ActionError("Upload a logo on the Growth plan or higher.")
-    }
-    const extMatch = parsedInput.filename.match(/\.([a-z0-9]+)$/i)
-    const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : ""
-    const storageKey = `${professional.id}/branding/logo-${crypto.randomUUID()}${ext}`
-    return { storageKey, bucket: BRANDING_LOGO_BUCKET }
+  .action(async ({ parsedInput, ctx }) => {
+    return prepareLogoUpload(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,24 +143,11 @@ const calendarSyncSchema = z.object({
 export const updateCalendarSyncAction = authedAction
   .metadata({ actionName: "settings.updateCalendar" })
   .inputSchema(calendarSyncSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    if (parsedInput.timezone && parsedInput.timezone !== professional.timezone) {
-      await updateProfessional({ timezone: parsedInput.timezone })
-    }
-
-    const nextSync: CalendarSync = {
-      ...(await getExistingSettings(professional.id)).calendarSync,
-      ...cleanUndefined(parsedInput),
-    }
-
-    await upsertProfessionalSettings(professional.id, { calendarSync: nextSync })
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateCalendarSync(ctx, parsedInput)
     revalidateSettingsSurfaces()
     revalidatePath("/dashboard/settings/calendar")
-    return { calendarSync: nextSync }
+    return result
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,21 +171,11 @@ const integrationsSchema = z.object({
 export const updateIntegrationsAction = authedAction
   .metadata({ actionName: "settings.updateIntegrations" })
   .inputSchema(integrationsSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    const existing = (await getExistingSettings(professional.id)).integrations
-    const next: IntegrationsConfig = {
-      ...existing,
-      ...cleanUndefined(parsedInput),
-    }
-
-    await upsertProfessionalSettings(professional.id, { integrations: next })
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateIntegrations(ctx, parsedInput)
     revalidateSettingsSurfaces()
     revalidatePath("/dashboard/settings/integrations")
-    return { integrations: next }
+    return result
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,20 +191,10 @@ const gdprSettingsSchema = z.object({
 export const updateGdprSettingsAction = authedAction
   .metadata({ actionName: "settings.updateGdpr" })
   .inputSchema(gdprSettingsSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    const existing = (await getExistingSettings(professional.id)).gdprSettings
-    const next: GdprSettings = {
-      ...existing,
-      ...cleanUndefined(parsedInput),
-    }
-
-    await upsertProfessionalSettings(professional.id, { gdprSettings: next })
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateGdprSettings(ctx, parsedInput)
     revalidatePath("/dashboard/settings/gdpr")
-    return { gdprSettings: next }
+    return result
   })
 
 const consentSchema = z.object({
@@ -295,49 +214,11 @@ const consentSchema = z.object({
 export const updateClientConsentAction = authedAction
   .metadata({ actionName: "settings.updateClientConsent" })
   .inputSchema(consentSchema)
-  .action(async ({ parsedInput }) => {
-    const professionalId = await getCurrentProfessionalId()
-    if (!professionalId) throw new ActionError("Unauthorized")
-
-    // Verify the client belongs to this professional (dbAdmin because the
-    // settings query runs RLS but we also want to guard the append).
-    const link = await dbAdmin
-      .select({ id: professionalClients.id })
-      .from(professionalClients)
-      .where(eq(professionalClients.clientId, parsedInput.clientId))
-      .limit(1)
-    if (!link[0]) throw new ActionError("Client not found")
-
-    const rows = await dbAdmin
-      .select({ metadata: clientSettings.metadata })
-      .from(clientSettings)
-      .where(eq(clientSettings.clientId, parsedInput.clientId))
-      .limit(1)
-    const existing = (rows[0]?.metadata ?? {}) as Record<string, unknown>
-    const log = Array.isArray(existing.consents)
-      ? (existing.consents as ConsentRecord[])
-      : []
-    const record: ConsentRecord = {
-      consent: parsedInput.consent,
-      granted: parsedInput.granted,
-      recordedAt: new Date().toISOString(),
-    }
-    const nextMetadata = { ...existing, consents: [...log, record] }
-
-    await dbAdmin
-      .insert(clientSettings)
-      .values({
-        clientId: parsedInput.clientId,
-        metadata: nextMetadata,
-      })
-      .onConflictDoUpdate({
-        target: clientSettings.clientId,
-        set: { metadata: nextMetadata, updatedAt: new Date() },
-      })
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateClientConsent(ctx, parsedInput)
     revalidatePath(`/dashboard/clients/${parsedInput.clientId}`)
     revalidatePath("/dashboard/settings/gdpr")
-    return { consent: record }
+    return result
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -355,31 +236,9 @@ export const inviteTeamMemberAction = authedAction
   .metadata({ actionName: "settings.inviteTeamMember" })
   .inputSchema(inviteMemberSchema)
   .action(async ({ ctx, parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-    const plan = getPlan(professional.plan)
-    if (!planAtLeast(plan.id, "pro")) {
-      throw new ActionError("Team management requires the Pro plan.")
-    }
-    if (!professional.clerkOrgId) {
-      throw new ActionError("Complete onboarding before inviting team members.")
-    }
-
-    const client = await clerkClient()
-    const invitation =
-      await client.organizations.createOrganizationInvitation({
-        organizationId: professional.clerkOrgId,
-        emailAddress: parsedInput.email,
-        role: parsedInput.role === "admin" ? "org:admin" : "org:member",
-        inviterUserId: ctx.userId,
-        publicMetadata: {
-          role: parsedInput.role === "admin" ? "professional" : "client",
-          invited_as_team: parsedInput.role === "admin",
-        },
-      })
-
+    const result = await inviteTeamMember(ctx, parsedInput)
     revalidatePath("/dashboard/settings/team")
-    return { invitationId: invitation.id }
+    return result
   })
 
 const removeMemberSchema = z.object({ userId: z.string().min(1) })
@@ -388,22 +247,9 @@ export const removeTeamMemberAction = authedAction
   .metadata({ actionName: "settings.removeTeamMember" })
   .inputSchema(removeMemberSchema)
   .action(async ({ ctx, parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional?.clerkOrgId) {
-      throw new ActionError("Unauthorized")
-    }
-    if (parsedInput.userId === ctx.userId) {
-      throw new ActionError("You can't remove yourself — delete the workspace instead.")
-    }
-
-    const client = await clerkClient()
-    await client.organizations.deleteOrganizationMembership({
-      organizationId: professional.clerkOrgId,
-      userId: parsedInput.userId,
-    })
-
+    const result = await removeTeamMember(ctx, parsedInput)
     revalidatePath("/dashboard/settings/team")
-    return { ok: true }
+    return result
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -419,108 +265,5 @@ export const deleteAccountAction = authedAction
   .metadata({ actionName: "settings.deleteAccount" })
   .inputSchema(deleteAccountSchema)
   .action(async ({ ctx, parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    if (
-      parsedInput.confirmEmail.trim().toLowerCase() !==
-      professional.email.trim().toLowerCase()
-    ) {
-      throw new ActionError("Confirmation email doesn't match.")
-    }
-
-    const client = await clerkClient()
-    // Delete the org first (if any) so its membership invitations stop firing.
-    if (professional.clerkOrgId) {
-      try {
-        await client.organizations.deleteOrganization(professional.clerkOrgId)
-      } catch {
-        // Non-fatal — the user delete below still removes their access.
-      }
-    }
-    await client.users.deleteUser(ctx.userId)
-    // The `user.deleted` webhook cascades DB cleanup. Return ok; the session
-    // is already invalid by the time this resolves.
-    return { ok: true }
+    return deleteAccount(ctx, parsedInput)
   })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ─────────────────────────────────────────────────────────────────────────────
-function cleanUndefined<T extends Record<string, unknown>>(obj: T): T {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) out[k] = v
-  }
-  return out as T
-}
-
-type ExistingSettings = {
-  calendarSync: CalendarSync
-  integrations: IntegrationsConfig
-  gdprSettings: GdprSettings
-}
-
-async function getExistingSettings(
-  professionalId: string,
-): Promise<ExistingSettings> {
-  const rows = await dbAdmin
-    .select({
-      calendarSync: professionalSettings.calendarSync,
-      integrations: professionalSettings.integrations,
-      gdprSettings: professionalSettings.gdprSettings,
-    })
-    .from(professionalSettings)
-    .where(eq(professionalSettings.professionalId, professionalId))
-    .limit(1)
-  return {
-    calendarSync: (rows[0]?.calendarSync as CalendarSync | null) ?? {},
-    integrations:
-      (rows[0]?.integrations as IntegrationsConfig | null) ?? {},
-    gdprSettings: (rows[0]?.gdprSettings as GdprSettings | null) ?? {},
-  }
-}
-
-async function upsertProfessionalSettings(
-  professionalId: string,
-  patch: Partial<{
-    calendarSync: CalendarSync
-    integrations: IntegrationsConfig
-    gdprSettings: GdprSettings
-  }>,
-) {
-  await withRLS(async (tx) => {
-    await tx
-      .insert(professionalSettings)
-      .values({ professionalId, ...patch })
-      .onConflictDoUpdate({
-        target: professionalSettings.professionalId,
-        set: { ...patch, updatedAt: new Date() },
-      })
-  })
-}
-
-// Shared export so the GDPR delete route can call straight into the same
-// cascade logic without duplicating FK cleanup.
-export async function cascadeDeleteClient(clientId: string): Promise<void> {
-  // FK cascades on `clients` handle documents, forms, messages, appointments,
-  // professional_clients, client_settings, client_tags. We also clear the
-  // Clerk user if the client accepted an invitation so they can't log back in.
-  const [row] = await dbAdmin
-    .select({ clerkUserId: clients.clerkUserId })
-    .from(clients)
-    .where(eq(clients.id, clientId))
-    .limit(1)
-
-  await dbAdmin.delete(clients).where(eq(clients.id, clientId))
-
-  if (row?.clerkUserId) {
-    try {
-      const client = await clerkClient()
-      await client.users.deleteUser(row.clerkUserId)
-    } catch {
-      // Clerk delete is best-effort — the local row is already gone.
-    }
-  }
-}
-
