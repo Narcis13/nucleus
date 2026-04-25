@@ -7,13 +7,15 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 ## 1. Think Before Coding
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+**Surface tradeoffs. Default to action — ask only when stakes are high.**
+
+Bias toward proceeding with the recommended approach **~85% of the time**. Stop and ask only when the cost of guessing wrong is high: destructive ops, irreversible architecture choices, security/auth changes, or ambiguous business intent that affects user-facing behavior.
 
 Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+- State your assumptions explicitly in one line, then proceed with the recommended approach. Don't open a Q&A round for every decision.
+- If multiple interpretations exist, pick the most likely one, name it briefly, and proceed. Only halt if the wrong pick is costly to undo.
+- If a simpler approach exists, use it and say so — don't ask for permission to simplify.
+- If something is genuinely unclear *and* high-stakes, stop and ask. For low-stakes ambiguity, make the call and note it.
 
 ## 2. Simplicity First
 
@@ -71,53 +73,28 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 These facts outlive any single session and apply to every contributor. Verify against current code before citing as fact — point-in-time observations drift.
 
-## Rails migration — decided 2026-04-23
+## Active path — `core-pro/` Next.js 15.5 (decided 2026-04-25)
 
-Nucleus is moving from Next.js 16 + RSC to Rails 8 + Hotwire. The 2-week spike finished in ~5 working days and passed 5 of 6 decision-gate questions. Part B (the 28-session full rebuild) is greenlit.
+**`core-pro/` on Next.js 15.5 LTS is the production path.** The earlier Rails rebuild plan (`docs/Nucleus-Rails-Implementation-Plan-v1.0.md`, `nucleus-rails-spike/`) is **paused** — read those for context if needed, but no new Rails sessions and no porting work back. New product work lands in `core-pro/`.
 
-- **Active plan:** `docs/Nucleus-Rails-Implementation-Plan-v1.0.md` v1.1 — 30 sessions: Rs1–Rs4, **Rs4.5 (API foundation)**, Rs5–Rs26, **Rs26.5 (OpenAPI + MCP)**, Rs27–Rs28.
-- **Working repo:** `nucleus-rails-spike/` is the spike. Part B lands in `nucleus-rails/` (sibling to `core-pro/`).
-- **Commit format:** one commit per session, `Rs{N}: <summary>` (e.g. `Rs5: clients CRUD + tags`). Decimal sessions use `Rs{N.M}:` (e.g. `Rs4.5: API foundation`). The spike days use `Spike Day N: <summary>`.
-- **Stack locked in:** Clerk (via `clerk-sdk-ruby`), Supabase Postgres + ActiveRecord + `acts_as_tenant` + RLS, ActionCable on Solid Cable, SolidQueue, Pay gem for Stripe (track `~> 11.0` — plan's `~> 8.0` pin is stale), Resend + ActionMailer, Kamal 2 on Hetzner. **API/MCP layer:** `alba` for JSON serialization, `rswag-specs` (or `oas_rails`) for OpenAPI 3.1, `fast-mcp` for the `/mcp` server, `Rack::Attack` for per-token rate limiting.
+**Why this stack, in this order of priority:**
+1. **Stability** — no canary, no alpha SDKs, no "let's try the new thing." Pin LTS / latest stable.
+2. **Speed of iteration** — favor what the team already knows over what's theoretically better. Boring tech wins.
+3. **Cutting-edge tech is explicitly not a goal.** If a feature only exists on Next canary, the answer is "we wait" or "we work around it," not "let's upgrade."
 
-**Known debts carried from the spike into Part B:**
-1. Test env currently points at the dev Supabase DB; set up a local Postgres test DB in Rs1 so Minitest can run tenancy isolation automatically.
-2. Pay's shipped `AddPayStiColumns` migration renames a just-created column and needs `safety_assured` to pass `strong_migrations`.
+**Removed — do not reintroduce without an explicit ask:**
+- **Sentry** — fully removed (SDK, `instrumentation.ts` hooks, `sentry.*.config.ts`, env vars). Errors go through native logging. Don't add `@sentry/nextjs` back.
+- **Next 16** — downgraded to 15.5 LTS. Don't bump back; the RSC rapid-refresh race (see memory `feedback_next16_rsc_rapid_refresh.md`) is why.
 
-## `core-pro/` is reference-only — and it's the parity bar
+**Active stack (verify against `core-pro/package.json` before citing as fact):**
+- Next.js **15.5 LTS**, middleware in `middleware.ts` (NOT `proxy.ts` — that was a Next 16 artifact)
+- React 19, Clerk Organizations, Supabase RLS via Clerk Third-Party Auth (`accessToken` callback — not the deprecated JWT-template flow)
+- Drizzle ORM (schema in `lib/db/schema/`, migrations in `supabase/migrations/`)
+- `next-safe-action` for Server Actions, Trigger.dev v4, Stripe v22, `zod@4` (with `zod/mini` in client bundles)
+- `@dnd-kit`, `@react-pdf/renderer`, Base UI
 
-The Next.js-path boilerplate (`core-pro/`) is frozen after the Rails decision. Read it for product behavior; do not add features, do not port fixes back, do not depend on it from anything new.
+**How to apply:**
+- Default new work to `core-pro/` and the existing patterns. Don't propose framework swaps or "while we're here, let's modernize X."
+- For dep upgrades: prefer the latest **stable** version, not bleeding-edge. Read the changelog for breaking changes before bumping majors.
+- If a request seems to need a cutting-edge feature, propose a stable workaround first.
 
-**But** it is the **feature-parity bar** for the Rails rebuild: before the Rails app ships v1.0 it must reach ~95% user-facing parity with `core-pro/` as of 2026-04-24. The parity matrix + new sessions that close identified gaps live in `docs/Nucleus-Rails-Implementation-Plan-v1.0.md` under "Feature Parity with core-pro" (Rs12.5 Invoicing, Rs19.5 PWA, Rs21.5 Dashboard Analytics + scope notes on Rs15/Rs4/Rs3). When scoping a Rails session, check that matrix before deciding something is out of scope; "core-pro already does this" means it's in scope. New features landed in core-pro *after* 2026-04-24 don't retroactively become parity requirements — they're their own sessions.
-
-That codebase's locked stack (documented here so a fresh session doesn't "helpfully modernize" it): Next.js 16 with middleware in `proxy.ts` (renamed in v16, not `middleware.ts`), React 19, Drizzle ORM (schema in `lib/db/schema/`, migrations in `supabase/migrations/`), Clerk native Third-Party Auth with Supabase (NOT the deprecated April 2025 JWT template flow — uses `accessToken` callback), `@dnd-kit` for DnD, `@react-pdf/renderer` for PDFs, `next-safe-action` for Server Actions, Trigger.dev v4, Stripe v22 (`new Stripe(key)` required), `zod@4` with `zod/mini` in client bundles.
-
-## Supabase BYPASSRLS gotcha — mandatory for any RLS table
-
-In Supabase Postgres, the `postgres` role that Rails connects as has `rolbypassrls = true`. RLS policies (even with `FORCE ROW LEVEL SECURITY`) are **silently ignored** on queries that run as that role. Without mitigation, RLS is a no-op in dev — it looks like it's working, it isn't.
-
-The pattern in `nucleus-rails-spike/app/models/application_record.rb` (`with_tenant_setting`):
-- Open a transaction (`SET LOCAL` requires one).
-- `SELECT set_config('app.professional_id', $1, true)` — bind param, no SQL interpolation.
-- `SET LOCAL ROLE authenticated` — drops BYPASSRLS for the request body.
-- Transaction end auto-resets both. No connection-checkin cleanup needed.
-
-**Role choice:** Supabase pre-grants full CRUD on public tables to `anon`, `authenticated`, and `service_role`. `service_role` also has BYPASSRLS, so use `authenticated` (or create a dedicated app role). Migrations still run as `postgres` so DDL works.
-
-**Fail-closed check:** `NULLIF(current_setting('app.professional_id', true), '')::uuid` evaluates to NULL when unset, which fails the policy's equality check and blocks all rows.
-
-**How to apply:** Any Rails session that adds an RLS-protected table on Supabase must wrap request-path queries in `ApplicationRecord.with_tenant_setting` (or equivalent). Verify with an integration test (see `bin/verify_tenancy` for the live-DB equivalent) that inserts cross-tenant rows and asserts they're not visible. Never assume RLS "just works" in Supabase dev — BYPASSRLS roles make it a trap.
-
-## API + MCP layer — single source of truth in Rails
-
-Nucleus exposes its API (REST + JSON at `/api/v1`) and MCP server (at `/mcp`) **from the same Rails app** that renders the Hotwire UI. Foundations land in Rs4.5; OpenAPI spec + MCP server land in Rs26.5. Both are backed by the same `PersonalAccessToken` auth and the same service objects under `app/services/`.
-
-**Do not propose a separate TS/Hono service backed by the same Postgres.** Considered and rejected on 2026-04-24: business logic (acts_as_tenant, Pundit, Pay gating, validations, state machines, ActionCable broadcast callbacks, audit trails) lives above SQL. Two writers means no source of truth, and the BYPASSRLS gotcha would need to be re-implemented in TS too. A TS layer that *consumes* the Rails API is fine; one that writes to the same DB is not.
-
-**Patterns to enforce:**
-- Every write goes through an `ApplicationService` subclass returning a `Result`. HTML controllers and `Api::V1::*` controllers both call the same service object — no business logic in either controller.
-- `Api::V1::BaseController < ActionController::API` is **token-only**, no cookies, no CSRF. The auth concern wraps actions in `ApplicationRecord.with_tenant_setting` so RLS applies on the API path too.
-- Cross-tenant requests return **404, not 403** — silent isolation prevents enumeration.
-- Token lookup happens *inside* the `with_tenant_setting` block, not before it (RLS must apply to the auth query too).
-- Engines (Rs28) inherit the API + MCP contract by subclassing the Rs4.5 base classes and calling `register_mcp_tool` in their initializer — verticals get REST + MCP for free, no per-engine plumbing.
-- Webhook **emitters** are not in scope yet; agents poll the API. If the user asks for push, treat it as a separate scope decision.

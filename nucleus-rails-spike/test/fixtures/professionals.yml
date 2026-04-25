@@ -1,9 +1,0 @@
-alice:
-  clerk_user_id: user_alice_test
-  email: alice@example.com
-  full_name: Alice Example
-
-bob:
-  clerk_user_id: user_bob_test
-  email: bob@example.com
-  full_name: Bob Example
