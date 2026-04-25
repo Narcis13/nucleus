@@ -1,6 +1,6 @@
 "use client"
 
-import { useSignIn, useSignUp } from "@clerk/nextjs"
+import { useAuth, useSignIn, useSignUp } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 
@@ -13,9 +13,11 @@ export function AcceptInviteClient() {
   const router = useRouter()
   const ticket = params.get("__clerk_ticket")
   const clerkStatus = params.get("__clerk_status")
+  const inviteEmail = params.get("email")
 
   const { signIn } = useSignIn()
   const { signUp } = useSignUp()
+  const { isSignedIn, isLoaded: authLoaded } = useAuth()
 
   const [uiStatus, setUiStatus] = useState<Status>("loading")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -62,28 +64,79 @@ export function AcceptInviteClient() {
   // is one call away from `'complete'`. finalize() activates the session.
   const completeSignUp = useCallback(async () => {
     if (!signUp || !ticket) return
+    // Race guard: if Clerk's session loaded between mount and the button
+    // click, jump straight to the portal — `signUp.ticket()` would otherwise
+    // 400 with "You're already signed in."
+    if (isSignedIn) {
+      goToPortal()
+      return
+    }
     setUiStatus("signing_up")
-    const { error } = await signUp.ticket({ ticket })
+    // Pass emailAddress alongside the ticket. `signUp.ticket(...)` is a
+    // shorthand for `signUp.create({ strategy: "ticket", ticket })` and
+    // doesn't accept extra fields, so we use the verbose form instead — this
+    // way Clerk has the email at create time and won't list it as missing.
+    const { error } = await signUp.create({
+      strategy: "ticket",
+      ticket,
+      ...(inviteEmail ? { emailAddress: inviteEmail.trim().toLowerCase() } : {}),
+    })
     if (error) {
+      // Clerk returns this when a stale session cookie is in the browser
+      // (typically from a half-finished previous attempt). Treat it as
+      // success — the user is already authenticated, just route them in.
+      if (isClerkErrorCode(error, "session_exists")) {
+        goToPortal()
+        return
+      }
       setErrorMessage(extractClerkError(error))
       setUiStatus("error")
       return
     }
-    if (signUp.status === "complete") {
-      const { error: finalizeError } = await signUp.finalize()
-      if (finalizeError) {
-        setErrorMessage(extractClerkError(finalizeError))
-        setUiStatus("error")
-        return
-      }
+
+    console.error("[accept-invite] after signUp.ticket()", {
+      status: signUp.status,
+      emailAddress: signUp.emailAddress,
+      missingFields: signUp.missingFields,
+      unverifiedFields: signUp.unverifiedFields,
+      requiredFields: signUp.requiredFields,
+      createdSessionId: signUp.createdSessionId,
+      inviteEmailFromUrl: inviteEmail,
+    })
+
+    // If Clerk created a session even when status isn't "complete" we can
+    // skip straight to /portal — the user is authenticated, downstream
+    // requirements are non-blocking.
+    if (signUp.createdSessionId) {
       goToPortal()
       return
     }
-    setErrorMessage(
-      "We couldn't finish setting up your account. Ask your agent to resend the link.",
-    )
-    setUiStatus("error")
-  }, [goToPortal, signUp, ticket])
+
+    // If Clerk says more is required, log + surface exactly what so we can
+    // either disable that requirement in the Clerk dashboard or collect it
+    // here. Common culprits: first_name, last_name, password, captcha.
+    if (signUp.status !== "complete") {
+      console.error("[accept-invite] signUp not complete after ticket()", {
+        status: signUp.status,
+        missingFields: signUp.missingFields,
+        unverifiedFields: signUp.unverifiedFields,
+        requiredFields: signUp.requiredFields,
+      })
+      setErrorMessage(
+        `Clerk requires more info — status="${signUp.status}", missing=${JSON.stringify(signUp.missingFields)}. Check the dashboard's user-attribute settings.`,
+      )
+      setUiStatus("error")
+      return
+    }
+
+    const { error: finalizeError } = await signUp.finalize()
+    if (finalizeError) {
+      setErrorMessage(extractClerkError(finalizeError))
+      setUiStatus("error")
+      return
+    }
+    goToPortal()
+  }, [goToPortal, inviteEmail, isSignedIn, signUp, ticket])
 
   useEffect(() => {
     if (startedRef.current) return
@@ -93,6 +146,14 @@ export function AcceptInviteClient() {
       )
       setUiStatus("error")
       startedRef.current = true
+      return
+    }
+
+    // Stale session from a half-finished previous attempt → just send them in.
+    // Clerk would otherwise reject signUp.ticket() with "user already logged in".
+    if (authLoaded && isSignedIn) {
+      startedRef.current = true
+      goToPortal()
       return
     }
 
@@ -115,7 +176,7 @@ export function AcceptInviteClient() {
       setUiStatus("ready_signup")
       return
     }
-  }, [clerkStatus, completeSignIn, goToPortal, signIn, signUp, ticket])
+  }, [authLoaded, clerkStatus, completeSignIn, goToPortal, isSignedIn, signIn, signUp, ticket])
 
   if (uiStatus === "loading" || uiStatus === "signing_in" || uiStatus === "signing_up") {
     return (
@@ -153,6 +214,9 @@ export function AcceptInviteClient() {
       <Button onClick={() => void completeSignUp()} className="w-full">
         Open my portal
       </Button>
+      {/* Mount point for Clerk's Smart CAPTCHA — required before signUp.ticket().
+          Without it Clerk falls back to invisible CAPTCHA and often fails. */}
+      <div id="clerk-captcha" />
     </div>
   )
 }
@@ -164,6 +228,12 @@ type ClerkErrorLike =
   | null
   | undefined
   | unknown
+
+function isClerkErrorCode(err: unknown, code: string): boolean {
+  if (!err || typeof err !== "object" || !("errors" in err)) return false
+  const list = (err as { errors?: Array<{ code?: string }> }).errors
+  return Array.isArray(list) && list.some((e) => e.code === code)
+}
 
 function extractClerkError(err: ClerkErrorLike): string {
   if (err && typeof err === "object" && "errors" in err) {

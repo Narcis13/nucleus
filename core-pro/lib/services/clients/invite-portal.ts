@@ -48,7 +48,12 @@ export async function inviteClientToPortal(
     throw new NotFoundError("Client not found.")
   }
 
-  const redirectUrl = new URL("/accept-invite", env.NEXT_PUBLIC_APP_URL).toString()
+  // Email is appended so /accept-invite can re-attach it on the SignUp
+  // resource — Clerk's `signUp.ticket()` doesn't always pre-populate it
+  // and we get `missing_requirements: ["email_address"]` otherwise.
+  const redirectTarget = new URL("/accept-invite", env.NEXT_PUBLIC_APP_URL)
+  redirectTarget.searchParams.set("email", client.email)
+  const redirectUrl = redirectTarget.toString()
   const { invitationId, url } = await createPortalMagicLink({
     email: client.email,
     professionalId: professional.id,
