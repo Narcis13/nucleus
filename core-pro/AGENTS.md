@@ -32,5 +32,7 @@ Errors thrown from services are typed (`lib/services/_lib/errors.ts`); the actio
 
 **When writing new domain logic:** write the service first, then the action shell. When editing an existing not-yet-migrated action, extract it to a service in the same change if cost is reasonable; otherwise leave a TODO and proceed without blocking the immediate task.
 
-**Migration state:** rollout started 2026-04-25. Pilot domain: `clients`. Other domains in `lib/actions/` may still hold inline logic — that's expected during rollout, not a license to add new inline logic. Full conventions, phased plan, and rationale: `core-pro/docs/services-extraction-plan.md`.
+**Canonical reference:** `core-pro/docs/services-pattern.md` — read it before writing or migrating service/action code.
+
+**Migration state:** rollout started 2026-04-25. Pilot domain: `clients`. Other domains in `lib/actions/` may still hold inline logic — that's expected during rollout, not a license to add new inline logic. Phased plan and rollout history: `core-pro/docs/services-extraction-plan.md`.
 <!-- END:services-architecture -->

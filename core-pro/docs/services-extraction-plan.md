@@ -169,11 +169,11 @@ Single PR, ~1 day.
 
 ### Phase 1 — Conventions doc
 
-Half day, after pilot ships.
+**Status:** Shipped 2026-04-25.
 
-- Promote this document (or a tightened version) into `core-pro/docs/services-pattern.md` as the canonical reference.
-- Add a one-line pointer in `core-pro/CLAUDE.md` so future Claude sessions follow the pattern automatically.
-- Optional: ESLint rule banning `lib/db` imports outside `lib/services/` and `lib/db/` itself. Defer if it bikesheds.
+- ✅ `core-pro/docs/services-pattern.md` is the canonical reference for the pattern. This file remains the rollout/history doc.
+- ✅ `core-pro/AGENTS.md` (loaded into every Claude session via `core-pro/CLAUDE.md → @AGENTS.md`) points to the canonical doc.
+- ⏭️ ESLint rule banning `lib/db` imports outside `lib/services/` and `lib/db/` deferred per plan — revisit after Phase 2 if drift becomes a problem.
 
 ### Phase 2 — Migrate remaining domains
 
