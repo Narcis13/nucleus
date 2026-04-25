@@ -55,6 +55,12 @@ export function usePushSubscription(): {
         if (!cancelled) setState("unsupported")
         return
       }
+      // PwaProvider skips SW registration in dev (and unregisters stale ones).
+      // This hook also calls register("/sw.js"), so gate it the same way.
+      if (process.env.NODE_ENV !== "production") {
+        if (!cancelled) setState("unsupported")
+        return
+      }
 
       const vapidAvailable = await fetchVapidKey()
         .then(() => true)

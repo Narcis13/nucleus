@@ -38,6 +38,18 @@ export function AcceptInviteClient() {
     if (!signIn || !ticket) return
     setUiStatus("signing_in")
     const { error } = await signIn.ticket({ ticket })
+
+    console.error("[accept-invite] after signIn.ticket()", {
+      status: signIn.status,
+      identifier: signIn.identifier,
+      supportedFirstFactors: signIn.supportedFirstFactors,
+      supportedSecondFactors: signIn.supportedSecondFactors,
+      firstFactorVerification: signIn.firstFactorVerification,
+      secondFactorVerification: signIn.secondFactorVerification,
+      createdSessionId: signIn.createdSessionId,
+      error,
+    })
+
     if (error) {
       setErrorMessage(extractClerkError(error))
       setUiStatus("error")
@@ -54,7 +66,7 @@ export function AcceptInviteClient() {
       return
     }
     setErrorMessage(
-      "We couldn't sign you in automatically. Ask your agent to send a fresh link.",
+      `We couldn't sign you in automatically (status="${signIn.status}"). Ask your agent to send a fresh link.`,
     )
     setUiStatus("error")
   }, [goToPortal, signIn, ticket])
@@ -104,10 +116,14 @@ export function AcceptInviteClient() {
       inviteEmailFromUrl: inviteEmail,
     })
 
-    // If Clerk created a session even when status isn't "complete" we can
-    // skip straight to /portal — the user is authenticated, downstream
-    // requirements are non-blocking.
-    if (signUp.createdSessionId) {
+    // Status "complete" must still go through .finalize() below — it's what
+    // actually activates the session in the browser. `createdSessionId` being
+    // set only means the session exists on the backend; without finalize the
+    // session cookie isn't written, so /portal would bounce through /sign-in.
+    //
+    // Only short-circuit when status is *not* complete but a session was
+    // created anyway (defensive — .finalize() requires status === "complete").
+    if (signUp.status !== "complete" && signUp.createdSessionId) {
       goToPortal()
       return
     }

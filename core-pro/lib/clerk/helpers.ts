@@ -200,6 +200,20 @@ export async function createPortalMagicLink(args: {
   redirectUrl: string
 }): Promise<{ invitationId: string; url: string }> {
   const client = await clerkClient()
+
+  // Proactively clear any stale Clerk state for this email *before* creating
+  // the invitation. Otherwise a half-completed previous attempt (user was
+  // created server-side but never finished the browser handshake) leaves the
+  // email mapped to a Clerk user, which makes the new invitation route the
+  // recipient through the sign-IN flow. v7's `signIn.ticket()` no-ops there
+  // (status stays "needs_identifier"), so portal access never completes.
+  // Deleting the stale client user forces the proven sign-UP path.
+  await clearStalePortalUser({
+    email: args.email,
+    inviterUserId: args.inviterUserId,
+    clerkOrgId: args.clerkOrgId,
+  })
+
   const invitation = await client.organizations.createOrganizationInvitation({
     organizationId: args.clerkOrgId,
     emailAddress: args.email,
@@ -212,6 +226,68 @@ export async function createPortalMagicLink(args: {
     },
   })
   return { invitationId: invitation.id, url: invitation.url ?? "" }
+}
+
+// Best-effort cleanup before issuing a new portal invite. Deletes any Clerk
+// user with this email that isn't a professional (per the `professionals`
+// table) and revokes any pending org invitations for the same email. Safety:
+// the `professionals` lookup ensures we never delete an agent — only
+// orphaned/half-completed client users get nuked. Each step swallows
+// already-resolved errors so callers can proceed.
+async function clearStalePortalUser(args: {
+  email: string
+  inviterUserId?: string
+  clerkOrgId: string
+}): Promise<void> {
+  const client = await clerkClient()
+
+  try {
+    const userListResp = await client.users.getUserList({
+      emailAddress: [args.email],
+    })
+    const users = "data" in userListResp ? userListResp.data : userListResp
+    for (const user of users) {
+      if (args.inviterUserId && user.id === args.inviterUserId) continue
+      // Safety: never delete a Clerk user that maps to a professionals row.
+      // Clerk doesn't auto-copy invitation publicMetadata to the user, so
+      // we can't rely on `user.publicMetadata.role` — query our own table.
+      const profRows = await dbAdmin
+        .select({ id: professionals.id })
+        .from(professionals)
+        .where(eq(professionals.clerkUserId, user.id))
+        .limit(1)
+      if (profRows.length > 0) continue
+      try {
+        await client.users.deleteUser(user.id)
+      } catch (e) {
+        if (!isAlreadyResolvedError(e)) throw e
+      }
+    }
+  } catch (e) {
+    if (!isAlreadyResolvedError(e)) throw e
+  }
+
+  try {
+    const invitesResp = await client.organizations.getOrganizationInvitationList({
+      organizationId: args.clerkOrgId,
+      status: ["pending"],
+    })
+    const invites = "data" in invitesResp ? invitesResp.data : invitesResp
+    const targetEmail = args.email.toLowerCase()
+    for (const inv of invites) {
+      if ((inv.emailAddress ?? "").toLowerCase() !== targetEmail) continue
+      try {
+        await client.organizations.revokeOrganizationInvitation({
+          organizationId: args.clerkOrgId,
+          invitationId: inv.id,
+        })
+      } catch (e) {
+        if (!isAlreadyResolvedError(e)) throw e
+      }
+    }
+  } catch (e) {
+    if (!isAlreadyResolvedError(e)) throw e
+  }
 }
 
 export async function revokePortalInvitation(args: {

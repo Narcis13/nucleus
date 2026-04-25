@@ -1,5 +1,5 @@
 import { verifyWebhook } from "@clerk/nextjs/webhooks"
-import { and, eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
@@ -164,6 +164,50 @@ async function handleMembershipCreated(data: MembershipData): Promise<void> {
     .filter(Boolean)
     .join(" ")
     .trim() || user.identifier
+
+  // Prefer linking to a clients row the agent pre-created (same email, scoped
+  // to this professional via professional_clients, no clerkUserId yet).
+  // Otherwise the INSERT below would create a duplicate row even when the
+  // agent already added the client manually before sending the invite.
+  const preExisting = await dbAdmin
+    .select({ id: clients.id })
+    .from(clients)
+    .innerJoin(
+      professionalClients,
+      eq(professionalClients.clientId, clients.id),
+    )
+    .where(
+      and(
+        eq(clients.email, user.identifier),
+        eq(professionalClients.professionalId, professionalId),
+        isNull(clients.clerkUserId),
+      ),
+    )
+    .limit(1)
+
+  if (preExisting[0]) {
+    await dbAdmin
+      .update(clients)
+      .set({
+        clerkUserId: user.user_id,
+        fullName,
+        avatarUrl: user.image_url || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(clients.id, preExisting[0].id))
+    // professional_clients row already exists (we joined on it). Re-activate
+    // in case a previous revoke flipped it to inactive.
+    await dbAdmin
+      .update(professionalClients)
+      .set({ status: "active", endDate: null })
+      .where(
+        and(
+          eq(professionalClients.professionalId, professionalId),
+          eq(professionalClients.clientId, preExisting[0].id),
+        ),
+      )
+    return
+  }
 
   const clientRows = await dbAdmin
     .insert(clients)

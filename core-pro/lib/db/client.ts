@@ -26,7 +26,9 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is not set — cannot initialise Drizzle client.")
 }
 
-const sql = postgres(databaseUrl, { prepare: false })
+// `idle_timeout` recycles connections unused for 20s so a sleeping macOS
+// dev box doesn't hand back a dead socket on wake (`EADDRNOTAVAIL` on read).
+const sql = postgres(databaseUrl, { prepare: false, idle_timeout: 20 })
 export const db = drizzle(sql, { schema, casing: "snake_case" })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,7 +42,7 @@ export const db = drizzle(sql, { schema, casing: "snake_case" })
 // in local dev where the postgres superuser already bypasses RLS).
 // ─────────────────────────────────────────────────────────────────────────────
 const adminUrl = env.DATABASE_URL_SERVICE_ROLE ?? databaseUrl
-const adminSql = postgres(adminUrl, { prepare: false })
+const adminSql = postgres(adminUrl, { prepare: false, idle_timeout: 20 })
 export const dbAdmin = drizzle(adminSql, { schema, casing: "snake_case" })
 
 export type DbClient = typeof db
