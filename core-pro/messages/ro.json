@@ -142,7 +142,8 @@
       "defaultWorkspace": "Spațiul tău",
       "accountMenu": "Meniul contului",
       "profile": "Profil",
-      "signOut": "Deconectare"
+      "signOut": "Deconectare",
+      "signedIn": "Conectat"
     },
     "messages": {
       "title": "Mesaje",

@@ -45,21 +45,24 @@ export async function updateProfessional(
   })
 }
 
+// Narrow branding-shaped projection of a professional for portal chrome.
+// Used by the portal layout / messages page so they don't pull sensitive
+// columns (stripe ids, billing, etc.) into a client-facing render path.
+type PortalProfessional = {
+  id: string
+  fullName: string
+  avatarUrl: string | null
+  branding: Professional["branding"]
+}
+
 // Resolves the professional whose workspace the currently-signed-in *client*
 // belongs to. Clients are invited as Clerk org members, so the active orgId
 // on the session is the professional's workspace.
 //
 // Uses `dbAdmin` because the RLS policies on `professionals` only permit the
 // professional themselves to SELECT their own row — a client in the same org
-// can't see it otherwise. We return a narrow branding-shaped projection so no
-// sensitive columns (stripe ids, billing, etc.) leak through this path even
-// if callers grow careless with it.
-export async function getProfessionalForClientPortal(): Promise<{
-  id: string
-  fullName: string
-  avatarUrl: string | null
-  branding: Professional["branding"]
-} | null> {
+// can't see it otherwise.
+export async function getProfessionalForClientPortal(): Promise<PortalProfessional | null> {
   const { orgId } = await auth()
   if (!orgId) return null
   const rows = await dbAdmin
@@ -71,6 +74,25 @@ export async function getProfessionalForClientPortal(): Promise<{
     })
     .from(professionals)
     .where(eq(professionals.clerkOrgId, orgId))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+// Same projection as above but resolved by professional uuid. Used by the
+// portal-auth path (cookie session resolves a `professionalId` directly, no
+// Clerk org context).
+export async function getPortalProfessionalById(
+  professionalId: string,
+): Promise<PortalProfessional | null> {
+  const rows = await dbAdmin
+    .select({
+      id: professionals.id,
+      fullName: professionals.fullName,
+      avatarUrl: professionals.avatarUrl,
+      branding: professionals.branding,
+    })
+    .from(professionals)
+    .where(eq(professionals.id, professionalId))
     .limit(1)
   return rows[0] ?? null
 }

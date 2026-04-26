@@ -1,28 +1,13 @@
-import { auth } from "@clerk/nextjs/server"
-import { eq } from "drizzle-orm"
 import { FolderOpen } from "lucide-react"
 
 import { PortalDocumentsSurface } from "@/components/portal/documents/portal-documents-surface"
 import { EmptyState, PageHeader } from "@/components/shared/page-header"
-import { dbAdmin } from "@/lib/db/client"
-import { getDocuments } from "@/lib/db/queries/documents"
-import { clients } from "@/lib/db/schema"
+import { getPortalDocuments } from "@/lib/db/queries/portal"
+import { requirePortalSession } from "@/lib/portal-auth/session"
 
 export default async function PortalDocumentsPage() {
-  const { userId } = await auth()
-  const clientRow = userId
-    ? (
-        await dbAdmin
-          .select({ id: clients.id })
-          .from(clients)
-          .where(eq(clients.clerkUserId, userId))
-          .limit(1)
-      )[0] ?? null
-    : null
-
-  // RLS on documents scopes to (a) rows owned by the pro, (b) rows linked to
-  // this client via `documents_client_select`. The portal user is side (b).
-  const documents = await getDocuments()
+  const session = await requirePortalSession()
+  const documents = await getPortalDocuments([session.clientId])
 
   if (documents.length === 0) {
     return (
@@ -31,10 +16,7 @@ export default async function PortalDocumentsPage() {
           title="Documents"
           description="Download files your professional shares and upload anything they've asked you to send."
         />
-        <PortalDocumentsSurface
-          documents={[]}
-          clientId={clientRow?.id ?? null}
-        />
+        <PortalDocumentsSurface documents={[]} clientId={session.clientId} />
         <EmptyState
           icon={<FolderOpen />}
           title="No documents yet"
@@ -52,7 +34,7 @@ export default async function PortalDocumentsPage() {
       />
       <PortalDocumentsSurface
         documents={documents}
-        clientId={clientRow?.id ?? null}
+        clientId={session.clientId}
       />
     </div>
   )

@@ -1,27 +1,33 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 
+import { dbAdmin } from "@/lib/db/client"
 import {
-  revokePortalActiveAccess,
-  revokePortalInvitation,
-} from "@/lib/clerk/helpers"
-import { clients } from "@/lib/db/schema"
+  clients,
+  portalInvites,
+  portalSessions,
+} from "@/lib/db/schema"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { trackServerEvent } from "@/lib/posthog/events"
 
 import type { ServiceContext } from "../_lib/context"
-import { NotFoundError, ServiceError, UnauthorizedError } from "../_lib/errors"
+import { NotFoundError, UnauthorizedError } from "../_lib/errors"
 
 export type RevokeClientPortalAccessInput = { clientId: string }
 export type RevokeClientPortalAccessResult = { revoked: true }
 
-// Revokes whichever combination of pending invite + active access the client
-// currently has. Always sets `portal_invite_revoked_at` so the UI can surface
-// "revoked" status; clears `portal_invite_id` / `portal_invite_url` so the
-// agent doesn't accidentally forward a stale magic link.
+// Cuts off both pending invites and active sessions for a client. Pending
+// magic-link rows are marked used (so the link can't be redeemed); active
+// `portal_sessions` rows are revoked so the next request from any browser
+// using one redirects to /portal/sign-in via `requirePortalSession`.
+//
+// `clients.portal_invite_revoked_at` is still written so the agent UI's
+// status badge flips to "revoked" — the column stays around as a UI hint
+// even though the DB-backed `portal_invites` / `portal_sessions` rows are
+// the source of truth now.
 export async function revokeClientPortalAccess(
-  ctx: ServiceContext,
+  _ctx: ServiceContext,
   input: RevokeClientPortalAccessInput,
 ): Promise<RevokeClientPortalAccessResult> {
   const professional = await getProfessional()
@@ -30,11 +36,8 @@ export async function revokeClientPortalAccess(
       "Complete onboarding before managing portal access.",
     )
   }
-  if (!professional.clerkOrgId) {
-    throw new ServiceError("Workspace not linked to Clerk yet.")
-  }
 
-  const [client] = await ctx.db
+  const [client] = await dbAdmin
     .select()
     .from(clients)
     .where(eq(clients.id, input.clientId))
@@ -43,23 +46,32 @@ export async function revokeClientPortalAccess(
     throw new NotFoundError("Client not found.")
   }
 
-  if (client.portalInviteId) {
-    await revokePortalInvitation({
-      invitationId: client.portalInviteId,
-      clerkOrgId: professional.clerkOrgId,
-      requestingUserId: professional.clerkUserId,
-    })
-  }
-
-  if (client.clerkUserId) {
-    await revokePortalActiveAccess({
-      clerkUserId: client.clerkUserId,
-      clerkOrgId: professional.clerkOrgId,
-    })
-  }
-
   const now = new Date()
-  await ctx.db
+
+  // Burn any unredeemed magic links — `requirePortalSession` rejects on
+  // `used_at IS NOT NULL`, so this stops a freshly-emailed link from working
+  // even if delivery is mid-flight.
+  await dbAdmin
+    .update(portalInvites)
+    .set({ usedAt: now })
+    .where(
+      and(eq(portalInvites.clientId, client.id), isNull(portalInvites.usedAt)),
+    )
+
+  // Revoke every live session — sliding-window touch in `readSession` fails
+  // because the row's `revoked_at` filter trips, so the cookie value is
+  // immediately worthless.
+  await dbAdmin
+    .update(portalSessions)
+    .set({ revokedAt: now })
+    .where(
+      and(
+        eq(portalSessions.clientId, client.id),
+        isNull(portalSessions.revokedAt),
+      ),
+    )
+
+  await dbAdmin
     .update(clients)
     .set({
       portalInviteId: null,

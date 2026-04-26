@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { authedAction } from "@/lib/actions/safe-action"
+import { authedAction, portalAction } from "@/lib/actions/safe-action"
 import { archiveForm } from "@/lib/services/forms/archive"
 import { assignForm } from "@/lib/services/forms/assign"
 import { createForm } from "@/lib/services/forms/create"
-import { submitFormResponse } from "@/lib/services/forms/submit-response"
+import { portalSubmitFormResponse } from "@/lib/services/forms/portal-submit-response"
 import { updateForm } from "@/lib/services/forms/update"
 import type { FormSchema } from "@/types/forms"
 
@@ -139,13 +139,17 @@ export const assignFormAction = authedAction
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Actions — Client side
+// Actions — Client side (portal)
+//
+// Auth comes from the `nucleus_portal` cookie session. The service layer
+// resolves the assignment by `(id, client_id)` so a stolen UUID can't open a
+// peer's assignment.
 // ─────────────────────────────────────────────────────────────────────────────
-export const submitFormResponseAction = authedAction
+export const submitFormResponseAction = portalAction
   .metadata({ actionName: "forms.submitResponse" })
   .inputSchema(submitResponseSchema)
   .action(async ({ ctx, parsedInput }) => {
-    const result = await submitFormResponse(ctx, parsedInput)
+    const result = await portalSubmitFormResponse(ctx, parsedInput)
     revalidatePath("/portal/forms")
     revalidatePath(`/portal/forms/${parsedInput.assignmentId}`)
     revalidatePath("/dashboard/forms")

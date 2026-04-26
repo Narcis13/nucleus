@@ -1,12 +1,12 @@
 import { PortalSignInClient } from "./portal-sign-in-client"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lost-link recovery (Phase 0.5).
+// Portal sign-in (lost-link recovery).
 //
 // Reachable when the client lost their original magic link or is on a new
-// device. Clerk emails them a fresh email-link; on success they land on
-// /portal. We bypass the dashboard's own /sign-in flow because portal users
-// don't have password credentials.
+// device. Posts to `requestPortalLinkAction` which mints a fresh
+// `portal_invites` row and emails it via Resend; the response is always
+// "check your inbox" so attackers can't enumerate registered emails.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PortalSignInPage() {
   return <PortalSignInClient />

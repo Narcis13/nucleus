@@ -2,17 +2,17 @@ import "server-only"
 
 import { eq } from "drizzle-orm"
 
-import { createPortalMagicLink } from "@/lib/clerk/helpers"
 import { clients } from "@/lib/db/schema"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { env } from "@/lib/env"
+import { issuePortalMagicLink } from "@/lib/portal-auth/issue"
 import { trackServerEvent } from "@/lib/posthog/events"
 import { sendEmail } from "@/lib/resend/client"
 import { getPlan } from "@/lib/stripe/plans"
 import type { Branding } from "@/types/domain"
 
 import type { ServiceContext } from "../_lib/context"
-import { NotFoundError, ServiceError, UnauthorizedError } from "../_lib/errors"
+import { NotFoundError, UnauthorizedError } from "../_lib/errors"
 
 export type InviteClientToPortalInput = { clientId: string }
 export type InviteClientToPortalResult = {
@@ -21,10 +21,10 @@ export type InviteClientToPortalResult = {
   email: string
 }
 
-// Generates a fresh magic-link invite for a client and persists the URL on
-// the client row so the agent can copy/forward it from the UI without
-// re-hitting Clerk. Idempotency is the caller's job — `resendClientPortalInvite`
-// wraps a revoke-then-create cycle for that case.
+// Mints a fresh magic-link invite for a client and persists the URL on the
+// client row so the agent can copy/forward it from the UI without re-issuing.
+// Idempotency is the caller's job — `resendClientPortalInvite` wraps a
+// revoke-then-create cycle for that case.
 export async function inviteClientToPortal(
   ctx: ServiceContext,
   input: InviteClientToPortalInput,
@@ -32,11 +32,6 @@ export async function inviteClientToPortal(
   const professional = await getProfessional()
   if (!professional) {
     throw new UnauthorizedError("Complete onboarding before inviting clients.")
-  }
-  if (!professional.clerkOrgId) {
-    throw new ServiceError(
-      "Finish workspace setup before sending portal invites.",
-    )
   }
 
   const [client] = await ctx.db
@@ -48,25 +43,16 @@ export async function inviteClientToPortal(
     throw new NotFoundError("Client not found.")
   }
 
-  // Email is appended so /accept-invite can re-attach it on the SignUp
-  // resource — Clerk's `signUp.ticket()` doesn't always pre-populate it
-  // and we get `missing_requirements: ["email_address"]` otherwise.
-  const redirectTarget = new URL("/accept-invite", env.NEXT_PUBLIC_APP_URL)
-  redirectTarget.searchParams.set("email", client.email)
-  const redirectUrl = redirectTarget.toString()
-  const { invitationId, url } = await createPortalMagicLink({
-    email: client.email,
+  const { inviteId, url } = await issuePortalMagicLink({
+    clientId: client.id,
     professionalId: professional.id,
-    clerkOrgId: professional.clerkOrgId,
-    inviterUserId: professional.clerkUserId,
-    redirectUrl,
   })
 
   const now = new Date()
   await ctx.db
     .update(clients)
     .set({
-      portalInviteId: invitationId,
+      portalInviteId: inviteId,
       portalInviteUrl: url,
       portalInviteSentAt: now,
       portalInviteRevokedAt: null,
@@ -100,5 +86,5 @@ export async function inviteClientToPortal(
     clientId: client.id,
   })
 
-  return { url, invitationId, email: client.email }
+  return { url, invitationId: inviteId, email: client.email }
 }

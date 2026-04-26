@@ -1,10 +1,11 @@
-import { redirect } from "next/navigation"
 import type { CSSProperties } from "react"
 
 import { PortalHeader } from "@/components/portal/header"
 import { PortalMobileNav } from "@/components/portal/mobile-nav"
-import { getCurrentClerkUserId } from "@/lib/clerk/helpers"
-import { getProfessionalForClientPortal } from "@/lib/db/queries/professionals"
+import { getPortalClientIdentity } from "@/lib/db/queries/portal"
+import { getPortalProfessionalById } from "@/lib/db/queries/professionals"
+import { requirePortalSession } from "@/lib/portal-auth/session"
+import { PortalSupabaseAuthProvider } from "@/lib/supabase/portal-context"
 import type { Branding } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,43 +20,52 @@ import type { Branding } from "@/types/domain"
 // components read `var(--primary)` etc. and automatically pick up the
 // professional's colours, so we don't have to thread props deep into the tree.
 //
-// Auth: the route is already covered by Clerk's middleware (`/portal(.*)`),
-// but we also gate here to avoid a brief flash of chrome on a cold navigation.
+// Auth: the layout is the trust boundary for the portal — `requirePortalSession`
+// reads the `nucleus_portal` cookie, validates the HMAC, looks up the session
+// row, and redirects to `/portal/sign-in` if anything is off.
 // ─────────────────────────────────────────────────────────────────────────────
 export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const clerkUserId = await getCurrentClerkUserId()
-  if (!clerkUserId) {
-    redirect("/sign-in?redirect_url=/portal")
-  }
+  const session = await requirePortalSession()
 
-  // Resolve the professional by the client's active Clerk org. May legitimately
-  // be null — e.g. a signed-in client who's between workspaces or whose org
-  // metadata hasn't synced yet — in which case we just render generic chrome.
-  const professional = await getProfessionalForClientPortal()
+  // Branding lookup off the resolved professional. Falls back to generic chrome
+  // if the row is missing (defensive — shouldn't happen because the session
+  // join already filtered to an active professional).
+  const [professional, clientIdentity] = await Promise.all([
+    getPortalProfessionalById(session.professionalId),
+    getPortalClientIdentity(session.clientId),
+  ])
   const branding = (professional?.branding ?? null) as Branding | null
   const brandName = professional?.fullName ?? null
   const brandLogoUrl = branding?.logo_url ?? professional?.avatarUrl ?? null
   const style = brandingToStyle(branding)
 
   return (
-    <div
-      className="flex min-h-dvh w-full flex-col bg-background text-foreground"
-      style={style}
-    >
-      <PortalHeader brandName={brandName} brandLogoUrl={brandLogoUrl} />
+    <PortalSupabaseAuthProvider>
+      <div
+        className="flex min-h-dvh w-full flex-col bg-background text-foreground"
+        style={style}
+      >
+        <PortalHeader
+          brandName={brandName}
+          brandLogoUrl={brandLogoUrl}
+          clientName={clientIdentity?.fullName ?? null}
+          clientEmail={clientIdentity?.email ?? null}
+          clientAvatarUrl={clientIdentity?.avatarUrl ?? null}
+        />
 
-      <main className="flex flex-1 flex-col pb-16 md:pb-0">
-        <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
-          {children}
-        </div>
-      </main>
+        <main className="flex flex-1 flex-col pb-16 md:pb-0">
+          <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+            {children}
+          </div>
+        </main>
 
-      <PortalMobileNav />
-    </div>
+        <PortalMobileNav />
+      </div>
+    </PortalSupabaseAuthProvider>
   )
 }
 

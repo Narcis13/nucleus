@@ -1,12 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useClerk } from "@clerk/nextjs"
 import { LogOut, Menu, User } from "lucide-react"
+import { useAction } from "next-safe-action/hooks"
 import { useTranslations } from "next-intl"
 import { useState } from "react"
 
+import { signOutPortalAction } from "@/app/portal/(authenticated)/actions"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,7 +20,6 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { LocaleSwitcher } from "@/components/shared/i18n/locale-switcher"
 import { NotificationBell } from "@/components/shared/notifications/notification-bell"
-import { usePortalContext } from "@/hooks/use-portal-context"
 import { cn, getInitials } from "@/lib/utils"
 
 import { PortalNav } from "./nav"
@@ -33,26 +32,32 @@ import { PortalNav } from "./nav"
 //   • Middle (desktop ≥ md): horizontal primary nav.
 //   • Right: the client's avatar with an account dropdown (sign out).
 //
-// Branding values come from the layout's server render (so colours and logo
-// paint on the first HTML, not after a client hydration hop). The client's
-// own identity comes from `usePortalContext` via Clerk.
+// Identity comes from the server layout — it resolves the portal session,
+// loads the professional's branding + the client's profile, and threads
+// everything as props. No Clerk hooks here; the trust boundary is the
+// `nucleus_portal` cookie validated server-side.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function PortalHeader({
   brandName,
   brandLogoUrl,
+  clientName,
+  clientEmail,
+  clientAvatarUrl,
 }: {
   brandName?: string | null
   brandLogoUrl?: string | null
+  clientName?: string | null
+  clientEmail?: string | null
+  clientAvatarUrl?: string | null
 }) {
-  const { client } = usePortalContext()
-  const { signOut } = useClerk()
-  const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const t = useTranslations("portal.header")
+  const { execute: signOut, isExecuting } = useAction(signOutPortalAction)
 
   const label = brandName?.trim() || t("defaultWorkspace")
   const initials = label.slice(0, 2).toUpperCase()
+  const accountFallback = getInitials(clientName ?? clientEmail ?? "?")
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/70">
@@ -119,26 +124,24 @@ export function PortalHeader({
               }
             >
               <Avatar size="sm">
-                {client.avatarUrl && (
+                {clientAvatarUrl && (
                   <AvatarImage
-                    src={client.avatarUrl}
-                    alt={client.fullName ?? "Client"}
+                    src={clientAvatarUrl}
+                    alt={clientName ?? "Client"}
                   />
                 )}
-                <AvatarFallback>
-                  {getInitials(client.fullName ?? client.email)}
-                </AvatarFallback>
+                <AvatarFallback>{accountFallback}</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[220px]">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span className="truncate text-sm font-medium text-foreground">
-                    {client.fullName || "Signed in"}
+                    {clientName || t("signedIn")}
                   </span>
-                  {client.email && (
+                  {clientEmail && (
                     <span className="truncate text-xs text-muted-foreground">
-                      {client.email}
+                      {clientEmail}
                     </span>
                   )}
                 </div>
@@ -151,8 +154,9 @@ export function PortalHeader({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
+                disabled={isExecuting}
                 onClick={() => {
-                  void signOut(() => router.push("/"))
+                  signOut({})
                 }}
               >
                 <LogOut className="size-4" />

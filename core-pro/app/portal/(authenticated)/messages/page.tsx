@@ -4,10 +4,15 @@ import { MessageInput } from "@/components/shared/chat/message-input"
 import { MessageThread } from "@/components/shared/chat/message-thread"
 import { EmptyState, PageHeader } from "@/components/shared/page-header"
 import {
-  getMessages,
-  getOrCreatePortalConversation,
-} from "@/lib/db/queries/messages"
-import { getProfessionalForClientPortal } from "@/lib/db/queries/professionals"
+  portalMarkMessagesAsReadAction,
+  portalSendMessageAction,
+} from "@/lib/actions/messages"
+import {
+  getOrCreatePortalConversationFor,
+  getPortalMessages,
+} from "@/lib/db/queries/portal"
+import { getPortalProfessionalById } from "@/lib/db/queries/professionals"
+import { requirePortalSession } from "@/lib/portal-auth/session"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal → Messages
@@ -18,9 +23,10 @@ import { getProfessionalForClientPortal } from "@/lib/db/queries/professionals"
 // single-column layout with no conversation list.
 // ─────────────────────────────────────────────────────────────────────────────
 export default async function PortalMessagesPage() {
+  const session = await requirePortalSession()
   const [professional, bootstrap] = await Promise.all([
-    getProfessionalForClientPortal(),
-    getOrCreatePortalConversation(),
+    getPortalProfessionalById(session.professionalId),
+    getOrCreatePortalConversationFor(session.clientId, session.professionalId),
   ])
 
   if (!bootstrap) {
@@ -39,7 +45,10 @@ export default async function PortalMessagesPage() {
     )
   }
 
-  const messages = await getMessages(bootstrap.conversation.id)
+  const messages = await getPortalMessages(
+    bootstrap.conversation.id,
+    session.clientId,
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,11 +68,13 @@ export default async function PortalMessagesPage() {
             initial={messages}
             currentSenderId={bootstrap.clientId}
             otherPartyLabel={professional?.fullName}
+            markReadAction={portalMarkMessagesAsReadAction}
           />
         </div>
         <MessageInput
           conversationId={bootstrap.conversation.id}
           owner={{ id: bootstrap.clientId, role: "client" }}
+          sendAction={portalSendMessageAction}
         />
       </div>
     </div>

@@ -1,6 +1,5 @@
 import "server-only"
 
-import { inviteClient as clerkInviteClient } from "@/lib/clerk/helpers"
 import { evaluateTrigger } from "@/lib/automations/engine"
 import {
   countActiveClients,
@@ -34,6 +33,10 @@ export type CreateClientInput = {
   invite: boolean
 }
 
+// `invited` is always false now — auto-invite at create time was the old
+// Clerk-org-invitation flow. The agent invites separately via
+// `inviteClientToPortalAction` after creation. The field stays in the result
+// shape for callers/UI; flip to `false` and let them re-prompt as needed.
 export type CreateClientResult = { id: string; invited: boolean }
 
 export async function createClient(
@@ -64,21 +67,6 @@ export async function createClient(
     { source: input.source || undefined },
   )
 
-  let invited = false
-  if (input.invite && professional.clerkOrgId) {
-    try {
-      await clerkInviteClient({
-        email: input.email,
-        professionalId: professional.id,
-        clerkOrgId: professional.clerkOrgId,
-        inviterUserId: professional.clerkUserId,
-      })
-      invited = true
-    } catch {
-      // Swallow; surfaced via `invited: false` in the response.
-    }
-  }
-
   void evaluateTrigger("new_client", {
     type: "new_client",
     professionalId: professional.id,
@@ -90,9 +78,9 @@ export async function createClient(
     professionalId: professional.id,
     plan: professional.plan,
     clientId: created.id,
-    invited,
+    invited: false,
     source: input.source || null,
   })
 
-  return { id: created.id, invited }
+  return { id: created.id, invited: false }
 }

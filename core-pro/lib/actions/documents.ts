@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { authedAction } from "@/lib/actions/safe-action"
+import { authedAction, portalAction } from "@/lib/actions/safe-action"
 import { createDocument } from "@/lib/services/documents/create"
 import { deleteDocument } from "@/lib/services/documents/delete"
 import { getInlineDocumentUrl } from "@/lib/services/documents/get-inline-url"
@@ -79,9 +79,10 @@ export const createDocumentAction = authedAction
 
 // ─────────────────────────────────────────────────────────────────────────────
 // portalPrepareDocumentUploadAction — portal-side counterpart that scopes the
-// storage key under the client's folder.
+// storage key under the client's folder. Auth comes from the portal cookie
+// session, not Clerk.
 // ─────────────────────────────────────────────────────────────────────────────
-export const portalPrepareDocumentUploadAction = authedAction
+export const portalPrepareDocumentUploadAction = portalAction
   .metadata({ actionName: "documents.portal.prepareUpload" })
   .inputSchema(
     z.object({
@@ -98,7 +99,7 @@ export const portalPrepareDocumentUploadAction = authedAction
 // portalCreateDocumentAction — inserts the metadata row for a file uploaded
 // from the portal.
 // ─────────────────────────────────────────────────────────────────────────────
-export const portalCreateDocumentAction = authedAction
+export const portalCreateDocumentAction = portalAction
   .metadata({ actionName: "documents.portal.create" })
   .inputSchema(portalCreateDocumentSchema)
   .action(async ({ parsedInput, ctx }) => {

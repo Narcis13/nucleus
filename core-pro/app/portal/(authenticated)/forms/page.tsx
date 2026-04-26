@@ -4,10 +4,12 @@ import Link from "next/link"
 import { EmptyState, PageHeader } from "@/components/shared/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { getClientAssignments } from "@/lib/db/queries/forms"
+import { getPortalAssignments } from "@/lib/db/queries/portal"
+import { requirePortalSession } from "@/lib/portal-auth/session"
 
 export default async function PortalFormsPage() {
-  const assignments = await getClientAssignments()
+  const session = await requirePortalSession()
+  const assignments = await getPortalAssignments(session.clientId)
 
   if (assignments.length === 0) {
     return (

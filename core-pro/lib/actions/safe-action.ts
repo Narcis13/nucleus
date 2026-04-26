@@ -8,8 +8,10 @@ import {
 import { headers } from "next/headers"
 import { z } from "zod"
 
+import { dbAdmin } from "@/lib/db/client"
 import { ServiceError } from "@/lib/services/_lib/errors"
 import { withRLS, type Tx } from "@/lib/db/rls"
+import { requirePortalSession } from "@/lib/portal-auth/session"
 import { apiRateLimit } from "@/lib/ratelimit"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,5 +126,46 @@ export const authedAction = baseClient.use(async ({ next, metadata }) => {
         db: tx,
       } satisfies AuthedActionCtx,
     })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// portalAction — counterpart to `authedAction` for the client portal. Reads
+// the `nucleus_portal` cookie, validates the session, and injects
+// `{ clientId, professionalId, sessionId, db }` into ctx.
+//
+// Unlike `authedAction`, this **does not** open a `withRLS` transaction.
+// Portal queries scope explicitly on `client_id` / `professional_id` from the
+// session — RLS via Clerk JWT doesn't apply because the caller has no Clerk
+// session at all. The trust boundary is the cookie HMAC + the DB-backed
+// session row (`requirePortalSession`).
+//
+// Missing / tampered / expired cookie → `requirePortalSession` calls
+// `redirect('/portal/sign-in')`, which surfaces as a NEXT_REDIRECT to the
+// caller (the client component follows it on the next tick).
+// ─────────────────────────────────────────────────────────────────────────────
+export type PortalActionCtx = {
+  clientId: string
+  professionalId: string
+  sessionId: string
+  db: typeof dbAdmin
+}
+
+export const portalAction = baseClient.use(async ({ next, metadata }) => {
+  const session = await requirePortalSession()
+  if (apiRateLimit) {
+    const key = `action:${metadata.actionName}:portal:${session.clientId}`
+    const { success } = await apiRateLimit.limit(key)
+    if (!success) {
+      throw new ActionError("Rate limit exceeded — try again in a moment.")
+    }
+  }
+  return next({
+    ctx: {
+      clientId: session.clientId,
+      professionalId: session.professionalId,
+      sessionId: session.sessionId,
+      db: dbAdmin,
+    } satisfies PortalActionCtx,
   })
 })

@@ -5,7 +5,8 @@ import { notFound } from "next/navigation"
 import { FormFiller } from "@/components/portal/forms/form-filler"
 import { PageHeader } from "@/components/shared/page-header"
 import { Button } from "@/components/ui/button"
-import { getClientAssignment } from "@/lib/db/queries/forms"
+import { getPortalAssignment } from "@/lib/db/queries/portal"
+import { requirePortalSession } from "@/lib/portal-auth/session"
 import {
   emptyFormSchema,
   isFormSchema,
@@ -18,7 +19,8 @@ export default async function PortalFillFormPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const detail = await getClientAssignment(id)
+  const session = await requirePortalSession()
+  const detail = await getPortalAssignment(id, session.clientId)
   if (!detail) notFound()
 
   const schema = isFormSchema(detail.form.schema)

@@ -142,7 +142,8 @@
       "defaultWorkspace": "Your workspace",
       "accountMenu": "Account menu",
       "profile": "Profile",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "signedIn": "Signed in"
     },
     "messages": {
       "title": "Messages",

@@ -2,10 +2,12 @@
 
 import { z } from "zod"
 
-import { ActionError, authedAction } from "@/lib/actions/safe-action"
+import { ActionError, authedAction, portalAction } from "@/lib/actions/safe-action"
 import { getOrCreateConversation } from "@/lib/services/messages/get-or-create-conversation"
 import { markMessagesAsRead } from "@/lib/services/messages/mark-as-read"
 import { openClientConversation } from "@/lib/services/messages/open-client-conversation"
+import { portalMarkMessagesAsRead } from "@/lib/services/messages/portal-mark-read"
+import { portalSendMessage } from "@/lib/services/messages/portal-send"
 import { sendMessage } from "@/lib/services/messages/send"
 import { simulateClientReply } from "@/lib/services/messages/simulate-client-reply"
 import { env } from "@/lib/env"
@@ -102,4 +104,24 @@ export const simulateClientReplyAction = authedAction
       throw new ActionError("Not available in production.")
     }
     return simulateClientReply(ctx, parsedInput)
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Portal-side variants — same input/output shape as the dashboard actions,
+// but auth comes from the `nucleus_portal` cookie session and the sender is
+// fixed to the calling client. Shared chat components accept either via the
+// `sendAction` / `markReadAction` props.
+// ─────────────────────────────────────────────────────────────────────────────
+export const portalSendMessageAction = portalAction
+  .metadata({ actionName: "messages.portal.send" })
+  .inputSchema(sendSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    return portalSendMessage(ctx, parsedInput)
+  })
+
+export const portalMarkMessagesAsReadAction = portalAction
+  .metadata({ actionName: "messages.portal.markRead" })
+  .inputSchema(idSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    return portalMarkMessagesAsRead(ctx, parsedInput)
   })

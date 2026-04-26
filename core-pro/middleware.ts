@@ -10,24 +10,20 @@ import {
   webhookRateLimit,
 } from "@/lib/ratelimit"
 
+// Clerk only protects the agent-facing surface area. The client portal has its
+// own cookie-based session (see `lib/portal-auth/`) and gates itself in the
+// `(authenticated)` layout via `requirePortalSession()`, so portal paths are
+// intentionally absent here.
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
-  "/portal(.*)",
   "/api/protected(.*)",
 ])
 
-// `/accept-invite` and `/portal/sign-in` are deliberately *unauthenticated*
-// landing pages — the magic-link ticket flow signs the visitor in client-side,
-// and the lost-link recovery form has to be reachable when they're signed out.
-const isPublicPortalRoute = createRouteMatcher([
-  "/accept-invite(.*)",
-  "/portal/sign-in(.*)",
-])
-
+// Auth landing pages — covered by `authRateLimit` so brute-forcing email
+// enumeration / magic-link issuance is bounded per IP.
 const isAuthRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
-  "/accept-invite(.*)",
   "/portal/sign-in(.*)",
 ])
 const isWebhookRoute = createRouteMatcher(["/api/webhooks(.*)"])
@@ -79,7 +75,7 @@ export default clerkMiddleware(async (auth, req) => {
   const limited = await enforceRateLimit(req)
   if (limited) return limited
 
-  if (isProtectedRoute(req) && !isPublicPortalRoute(req)) {
+  if (isProtectedRoute(req)) {
     await auth.protect()
   }
 })

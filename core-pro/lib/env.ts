@@ -25,6 +25,16 @@ export const env = createEnv({
     RESEND_API_KEY: z.string().min(1),
     RESEND_FROM_EMAIL: z.string().email(),
 
+    // ── Portal auth ──
+    // HMAC key for the `nucleus_portal` cookie. Must be ≥ 32 chars; rotate by
+    // generating a new value and redeploying — existing sessions get invalidated.
+    PORTAL_SESSION_SECRET: z.string().min(32),
+    // Supabase project's JWT secret (Settings → API → "JWT Secret"). Used by
+    // `lib/supabase/portal-jwt.ts` to mint short-lived HS256 tokens that
+    // Supabase Realtime + Storage accept on the portal path. This must be the
+    // ONLY module that reads the secret — see Phase 6 risk note.
+    SUPABASE_JWT_SECRET: z.string().min(32),
+
     // ── Trigger.dev v4 ──
     TRIGGER_SECRET_KEY: z.string().min(1).optional(),
     TRIGGER_API_URL: z.string().url().default("https://api.trigger.dev"),
@@ -89,6 +99,8 @@ export const env = createEnv({
     STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    PORTAL_SESSION_SECRET: process.env.PORTAL_SESSION_SECRET,
+    SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET,
     TRIGGER_SECRET_KEY: process.env.TRIGGER_SECRET_KEY,
     TRIGGER_API_URL: process.env.TRIGGER_API_URL,
     UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,

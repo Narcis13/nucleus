@@ -1,11 +1,5 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
-
-import { auth } from "@clerk/nextjs/server"
-
-import { dbAdmin } from "@/lib/db/client"
-import { clients, professionalClients } from "@/lib/db/schema"
 import { getPlan, planLimitsFor } from "@/lib/stripe/plans"
 import type { PlanLimits } from "@/types/domain"
 
@@ -52,30 +46,3 @@ export function buildStorageKey(args: {
   return `${args.professionalId}/${folder}/${id}-${sanitizeFilename(args.filename)}`
 }
 
-// Resolves the signed-in user to a client row (portal side). Reads through
-// `dbAdmin` because RLS on `clients` is keyed off the professional, not the
-// client's own Clerk id, so the client can't SELECT themselves directly.
-export async function resolveClient(): Promise<
-  { id: string; professionalId: string | null } | null
-> {
-  const { userId } = await auth()
-  if (!userId) return null
-  const rows = await dbAdmin
-    .select({ id: clients.id })
-    .from(clients)
-    .where(eq(clients.clerkUserId, userId))
-    .limit(1)
-  const client = rows[0]
-  if (!client) return null
-  // A client can belong to multiple professionals in theory; in our MVP the
-  // portal is single-tenant per Clerk org, so pick the first active link.
-  const linkRows = await dbAdmin
-    .select({ professionalId: professionalClients.professionalId })
-    .from(professionalClients)
-    .where(eq(professionalClients.clientId, client.id))
-    .limit(1)
-  return {
-    id: client.id,
-    professionalId: linkRows[0]?.professionalId ?? null,
-  }
-}

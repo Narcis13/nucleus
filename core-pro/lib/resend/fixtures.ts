@@ -37,7 +37,7 @@ export const SAMPLE_FIXTURES: FixtureMap = {
   "client-invitation": (brand) => ({
     ...brand,
     recipientName: "Maria Ionescu",
-    inviteUrl: `${brand.appUrl}/accept-invite/sample-token`,
+    inviteUrl: `${brand.appUrl}/portal/verify?token=sample-token`,
     expiresInDays: 7,
     customMessage: "Looking forward to working with you. Let me know if you have any questions before our first session.",
   }),

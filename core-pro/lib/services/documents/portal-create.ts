@@ -1,10 +1,10 @@
 import "server-only"
 
-import { createDocumentFromClient } from "@/lib/db/queries/documents"
+import { dbAdmin } from "@/lib/db/client"
+import { documents } from "@/lib/db/schema"
 
-import type { ServiceContext } from "../_lib/context"
-import { ServiceError, UnauthorizedError } from "../_lib/errors"
-import { resolveClient } from "./_helpers"
+import type { PortalActionCtx } from "@/lib/actions/safe-action"
+import { ServiceError } from "../_lib/errors"
 
 export type PortalCreateDocumentInput = {
   storageKey: string
@@ -16,34 +16,32 @@ export type PortalCreateDocumentInput = {
 export type PortalCreateDocumentResult = { id: string; clientId: string }
 
 // Inserts the metadata row for a file the client has uploaded from the portal.
-// Bypasses RLS for the insert (service role) because portal-side inserts would
-// need the client-insert policy, which requires the storage key to already be
-// tied to a row — chicken-and-egg. We do our own authorization instead.
+// Identity comes from the portal cookie session (`ctx.clientId` /
+// `ctx.professionalId`) — the storage key must live under that pair's folder
+// so the pro (and only the pro) can read it back.
 export async function portalCreateDocument(
-  _ctx: ServiceContext,
+  ctx: PortalActionCtx,
   input: PortalCreateDocumentInput,
 ): Promise<PortalCreateDocumentResult> {
-  const client = await resolveClient()
-  if (!client || !client.professionalId) {
-    throw new UnauthorizedError("Unauthorized")
-  }
-  // Storage key must live under the client's folder so the pro (and only the
-  // pro) can read it back.
-  const expectedPrefix = `${client.professionalId}/${client.id}/`
+  const expectedPrefix = `${ctx.professionalId}/${ctx.clientId}/`
   if (!input.storageKey.startsWith(expectedPrefix)) {
     throw new ServiceError("Invalid storage key.")
   }
 
-  const doc = await createDocumentFromClient({
-    professionalId: client.professionalId,
-    clientId: client.id,
-    uploadedBy: client.id,
-    name: input.name,
-    fileUrl: input.storageKey,
-    fileType: input.fileType ?? null,
-    fileSize: input.fileSize,
-    category: "General",
-  })
+  const [created] = await dbAdmin
+    .insert(documents)
+    .values({
+      professionalId: ctx.professionalId,
+      clientId: ctx.clientId,
+      uploadedBy: ctx.clientId,
+      name: input.name,
+      fileUrl: input.storageKey,
+      fileType: input.fileType ?? null,
+      fileSize: input.fileSize,
+      category: "General",
+    })
+    .returning({ id: documents.id })
 
-  return { id: doc.id, clientId: client.id }
+  if (!created) throw new ServiceError("Failed to insert document")
+  return { id: created.id, clientId: ctx.clientId }
 }
