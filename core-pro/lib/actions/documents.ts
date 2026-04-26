@@ -9,6 +9,8 @@ import { deleteDocument } from "@/lib/services/documents/delete"
 import { getInlineDocumentUrl } from "@/lib/services/documents/get-inline-url"
 import { getSignedDocumentUrl } from "@/lib/services/documents/get-signed-url"
 import { portalCreateDocument } from "@/lib/services/documents/portal-create"
+import { portalDeleteDocument } from "@/lib/services/documents/portal-delete"
+import { portalGetDocumentUrl } from "@/lib/services/documents/portal-get-url"
 import { portalPrepareDocumentUpload } from "@/lib/services/documents/portal-prepare-upload"
 import { prepareDocumentUpload } from "@/lib/services/documents/prepare-upload"
 import { renameDocument } from "@/lib/services/documents/rename"
@@ -132,6 +134,25 @@ export const getInlineDocumentUrlAction = authedAction
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// portalGetSignedDocumentUrlAction / portalGetInlineDocumentUrlAction —
+// portal counterparts. Authorize via the cookie session and the document's
+// (clientId, professionalId) pair instead of Clerk RLS.
+// ─────────────────────────────────────────────────────────────────────────────
+export const portalGetSignedDocumentUrlAction = portalAction
+  .metadata({ actionName: "documents.portal.signedUrl" })
+  .inputSchema(signUrlSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    return portalGetDocumentUrl(ctx, { id: parsedInput.id, download: true })
+  })
+
+export const portalGetInlineDocumentUrlAction = portalAction
+  .metadata({ actionName: "documents.portal.inlineUrl" })
+  .inputSchema(signUrlSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    return portalGetDocumentUrl(ctx, { id: parsedInput.id, download: false })
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // deleteDocumentAction — removes the storage object and DB row atomically.
 // ─────────────────────────────────────────────────────────────────────────────
 export const deleteDocumentAction = authedAction
@@ -144,6 +165,21 @@ export const deleteDocumentAction = authedAction
     if (result.clientId) {
       revalidatePath(`/dashboard/clients/${result.clientId}`)
     }
+    return { id: result.id }
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// portalDeleteDocumentAction — portal counterpart. Authorizes via the cookie
+// session and only allows deleting files the client uploaded themselves.
+// ─────────────────────────────────────────────────────────────────────────────
+export const portalDeleteDocumentAction = portalAction
+  .metadata({ actionName: "documents.portal.delete" })
+  .inputSchema(idSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await portalDeleteDocument(ctx, parsedInput)
+    revalidatePath("/portal/documents")
+    revalidatePath("/dashboard/documents")
+    revalidatePath(`/dashboard/clients/${result.clientId}`)
     return { id: result.id }
   })
 

@@ -31,6 +31,8 @@ import {
 import {
   deleteDocumentAction,
   getSignedDocumentUrlAction,
+  portalDeleteDocumentAction,
+  portalGetSignedDocumentUrlAction,
   shareDocumentWithClientAction,
 } from "@/lib/actions/documents"
 import { cn } from "@/lib/utils"
@@ -55,40 +57,52 @@ export function DocumentList({
   documents,
   mode,
   clients,
+  currentClientId,
   className,
   emptyState,
 }: {
   documents: DocumentListRow[]
   mode: Mode
   clients?: Array<Pick<Client, "id" | "fullName">>
+  // In client mode, the portal session's clientId — used to gate the delete
+  // button to rows the client actually uploaded (vs. ones the pro shared).
+  currentClientId?: string | null
   className?: string
   emptyState?: ReactNode
 }) {
   const router = useRouter()
   const [previewing, setPreviewing] = useState<Document | null>(null)
 
-  const downloadAction = useAction(getSignedDocumentUrlAction, {
-    onSuccess: ({ data }) => {
-      if (data?.url) {
-        // Open in a new tab — signed URL already carries a `download=` param
-        // so the browser treats it as an attachment.
-        window.open(data.url, "_blank", "noopener,noreferrer")
-      }
+  const downloadAction = useAction(
+    mode === "client"
+      ? portalGetSignedDocumentUrlAction
+      : getSignedDocumentUrlAction,
+    {
+      onSuccess: ({ data }) => {
+        if (data?.url) {
+          // Open in a new tab — signed URL already carries a `download=` param
+          // so the browser treats it as an attachment.
+          window.open(data.url, "_blank", "noopener,noreferrer")
+        }
+      },
+      onError: ({ error }) => {
+        toast.error(error.serverError ?? "Couldn't get download link.")
+      },
     },
-    onError: ({ error }) => {
-      toast.error(error.serverError ?? "Couldn't get download link.")
-    },
-  })
+  )
 
-  const deleteAction = useAction(deleteDocumentAction, {
-    onSuccess: () => {
-      toast.success("Document deleted.")
-      router.refresh()
+  const deleteAction = useAction(
+    mode === "client" ? portalDeleteDocumentAction : deleteDocumentAction,
+    {
+      onSuccess: () => {
+        toast.success("Document deleted.")
+        router.refresh()
+      },
+      onError: ({ error }) => {
+        toast.error(error.serverError ?? "Couldn't delete.")
+      },
     },
-    onError: ({ error }) => {
-      toast.error(error.serverError ?? "Couldn't delete.")
-    },
-  })
+  )
 
   const shareAction = useAction(shareDocumentWithClientAction, {
     onSuccess: () => {
@@ -227,20 +241,22 @@ export function DocumentList({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-                {mode === "client" && doc.clientId && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Delete"
-                    onClick={() => {
-                      if (window.confirm(`Delete "${doc.name}"?`)) {
-                        deleteAction.execute({ id: doc.id })
-                      }
-                    }}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                )}
+                {mode === "client" &&
+                  currentClientId &&
+                  doc.uploadedBy === currentClientId && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete"
+                      onClick={() => {
+                        if (window.confirm(`Delete "${doc.name}"?`)) {
+                          deleteAction.execute({ id: doc.id })
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
               </div>
             </li>
           ))}
@@ -251,6 +267,7 @@ export function DocumentList({
         document={previewing}
         open={previewing !== null}
         onOpenChange={(o) => !o && setPreviewing(null)}
+        mode={mode}
       />
     </>
   )

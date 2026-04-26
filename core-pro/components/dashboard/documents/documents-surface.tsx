@@ -128,7 +128,15 @@ export function DocumentsSurface({
           onValueChange={(v) => setClientFilter(v ?? CLIENT_ALL)}
         >
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="All clients" />
+            <SelectValue placeholder="All clients">
+              {(value: string | null) => {
+                if (value === CLIENT_ALL || !value) return "All clients"
+                if (value === CLIENT_GENERAL) return "General only"
+                return (
+                  clients.find((c) => c.id === value)?.fullName ?? "All clients"
+                )
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={CLIENT_ALL}>All clients</SelectItem>

@@ -241,7 +241,14 @@ export function DocumentUpload({
                 onValueChange={(v) => setClientSelection(v ?? "none")}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="General (no client)" />
+                  <SelectValue placeholder="General (no client)">
+                    {(value: string | null) =>
+                      value && value !== "none"
+                        ? (clients.find((c) => c.id === value)?.fullName ??
+                          "General (no client)")
+                        : "General (no client)"
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">General (no client)</SelectItem>
