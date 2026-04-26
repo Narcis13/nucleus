@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, FileText } from "lucide-react"
+import { CheckCircle2, Clock, FileText, Inbox } from "lucide-react"
 import Link from "next/link"
 
 import { EmptyState, PageHeader } from "@/components/shared/page-header"
@@ -23,6 +23,7 @@ export default async function PortalFormsPage() {
           title="No forms to fill out"
           description="When your professional assigns you a form, it will show up here."
         />
+        <AboutMeLink />
       </div>
     )
   }
@@ -112,7 +113,32 @@ export default async function PortalFormsPage() {
           </ul>
         </section>
       )}
+
+      <AboutMeLink />
     </div>
+  )
+}
+
+function AboutMeLink() {
+  return (
+    <Link href="/portal/forms/about-me" className="block">
+      <Card className="transition-colors hover:border-primary/40">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Inbox className="size-5 text-muted-foreground" />
+            <div className="flex flex-col">
+              <h3 className="font-heading text-base font-semibold text-foreground">
+                Responses about you
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Surveys submitted about you by third parties — e.g. viewers
+                of your property.
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+    </Link>
   )
 }
 

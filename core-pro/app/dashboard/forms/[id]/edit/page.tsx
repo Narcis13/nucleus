@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation"
 
 import { FormBuilder } from "@/components/dashboard/forms/form-builder"
+import { PublicSharesList } from "@/components/dashboard/forms/public-shares-list"
 import { ResponsesList } from "@/components/dashboard/forms/responses-list"
 import { PageHeader } from "@/components/shared/page-header"
 import { getClients } from "@/lib/db/queries/clients"
-import { getFormDetail } from "@/lib/db/queries/forms"
+import { getFormDetail, getFormPublicShares } from "@/lib/db/queries/forms"
 import { emptyFormSchema, isFormSchema } from "@/types/forms"
 
 export default async function FormEditorPage({
@@ -13,9 +14,10 @@ export default async function FormEditorPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [detail, clientList] = await Promise.all([
+  const [detail, clientList, shares] = await Promise.all([
     getFormDetail(id),
     getClients({ status: "active" }),
+    getFormPublicShares(id),
   ])
   if (!detail) notFound()
 
@@ -40,6 +42,7 @@ export default async function FormEditorPage({
           email: c.client.email,
         }))}
       />
+      <PublicSharesList formId={detail.form.id} shares={shares} />
       <ResponsesList
         schema={schema}
         assignments={detail.assignments}

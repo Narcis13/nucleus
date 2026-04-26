@@ -1,15 +1,25 @@
 import "server-only"
 
+import { createHash } from "node:crypto"
+
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 
+import { dbAdmin } from "@/lib/db/client"
 import { withRLS } from "@/lib/db/rls"
 import {
   clients,
   formAssignments,
+  formPublicShares,
   formResponses,
   forms,
 } from "@/lib/db/schema"
-import type { Client, Form, FormAssignment, FormResponse } from "@/types/domain"
+import type {
+  Client,
+  Form,
+  FormAssignment,
+  FormPublicShare,
+  FormResponse,
+} from "@/types/domain"
 import type { FormResponseData, FormSchema } from "@/types/forms"
 
 import { getProfessional } from "./professionals"
@@ -372,4 +382,88 @@ export async function getExistingAssignmentsForClients(
       )
     return new Set(rows.map((r) => r.clientId))
   })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC SHARES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Listed under the form's edit page so the pro can see active links and
+// revoke them. Joins the subject client (e.g. property owner) for display.
+export async function getFormPublicShares(formId: string): Promise<
+  Array<
+    FormPublicShare & {
+      subjectClient: Pick<Client, "id" | "fullName"> | null
+    }
+  >
+> {
+  return withRLS(async (tx) => {
+    const rows = await tx
+      .select({
+        share: formPublicShares,
+        subjectClient: {
+          id: clients.id,
+          fullName: clients.fullName,
+        },
+      })
+      .from(formPublicShares)
+      .leftJoin(clients, eq(clients.id, formPublicShares.subjectClientId))
+      .where(eq(formPublicShares.formId, formId))
+      .orderBy(desc(formPublicShares.createdAt))
+    return rows.map((r) => ({
+      ...r.share,
+      subjectClient: r.subjectClient?.id ? r.subjectClient : null,
+    }))
+  })
+}
+
+// Server-side resolution of a raw share token to its share + form. Used by
+// the public /share/[token] page; the token comes from the URL. We return
+// the row even if revoked/expired/exhausted so the caller can render an
+// informative error page (vs a generic 404).
+export async function resolvePublicShareByToken(token: string): Promise<
+  | {
+      share: FormPublicShare
+      form: Form
+    }
+  | null
+> {
+  const tokenHash = createHash("sha256").update(token).digest()
+  const rows = await dbAdmin
+    .select({
+      share: formPublicShares,
+      form: forms,
+    })
+    .from(formPublicShares)
+    .innerJoin(forms, eq(forms.id, formPublicShares.formId))
+    .where(eq(formPublicShares.tokenHash, tokenHash))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+// Owner-side: surveys submitted *about* this client (e.g. apartment owner
+// reading what viewers said). Uses dbAdmin since portal sessions don't
+// satisfy Clerk-JWT-based RLS — the explicit clientId filter takes the
+// place of the policy on this surface.
+export async function getResponsesAboutClient(clientId: string): Promise<
+  Array<{
+    response: FormResponse
+    form: Pick<Form, "id" | "title" | "description" | "schema">
+  }>
+> {
+  const rows = await dbAdmin
+    .select({
+      response: formResponses,
+      form: {
+        id: forms.id,
+        title: forms.title,
+        description: forms.description,
+        schema: forms.schema,
+      },
+    })
+    .from(formResponses)
+    .innerJoin(forms, eq(forms.id, formResponses.formId))
+    .where(eq(formResponses.subjectClientId, clientId))
+    .orderBy(desc(formResponses.submittedAt))
+  return rows
 }

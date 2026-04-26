@@ -3,11 +3,20 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { authedAction, portalAction } from "@/lib/actions/safe-action"
+import {
+  ActionError,
+  authedAction,
+  portalAction,
+  publicAction,
+} from "@/lib/actions/safe-action"
+import { apiRateLimit } from "@/lib/ratelimit"
 import { archiveForm } from "@/lib/services/forms/archive"
 import { assignForm } from "@/lib/services/forms/assign"
 import { createForm } from "@/lib/services/forms/create"
+import { createPublicShare } from "@/lib/services/forms/create-public-share"
 import { portalSubmitFormResponse } from "@/lib/services/forms/portal-submit-response"
+import { publicSubmitFormResponse } from "@/lib/services/forms/public-submit-response"
+import { revokePublicShare } from "@/lib/services/forms/revoke-public-share"
 import { updateForm } from "@/lib/services/forms/update"
 import type { FormSchema } from "@/types/forms"
 
@@ -89,6 +98,26 @@ const submitResponseSchema = z.object({
   ),
 })
 
+const responseDataSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.array(z.string()), z.null()]),
+)
+
+const createPublicShareSchema = z.object({
+  formId: z.string().uuid(),
+  subjectClientId: z.string().uuid().nullable().optional(),
+  subjectAppointmentId: z.string().uuid().nullable().optional(),
+  maxResponses: z.number().int().min(1).max(500).optional(),
+  // null = never expires; omitted = default (30 days, applied in service).
+  expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
+})
+
+const submitPublicResponseSchema = z.object({
+  // Raw token from the URL — base64url-encoded 32 random bytes (≈43 chars).
+  token: z.string().min(20).max(120),
+  data: responseDataSchema,
+})
+
 const idSchema = z.object({ id: z.string().uuid() })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,5 +182,44 @@ export const submitFormResponseAction = portalAction
     revalidatePath("/portal/forms")
     revalidatePath(`/portal/forms/${parsedInput.assignmentId}`)
     revalidatePath("/dashboard/forms")
+    return result
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Actions — Public share (third-party fillers like property viewers)
+// ─────────────────────────────────────────────────────────────────────────────
+export const createPublicShareAction = authedAction
+  .metadata({ actionName: "forms.createPublicShare" })
+  .inputSchema(createPublicShareSchema)
+  .action(async ({ ctx, parsedInput }) => {
+    const result = await createPublicShare(ctx, parsedInput)
+    revalidatePath(`/dashboard/forms/${parsedInput.formId}/edit`)
+    return result
+  })
+
+export const revokePublicShareAction = authedAction
+  .metadata({ actionName: "forms.revokePublicShare" })
+  .inputSchema(z.object({ id: z.string().uuid(), formId: z.string().uuid() }))
+  .action(async ({ ctx, parsedInput }) => {
+    const result = await revokePublicShare(ctx, { id: parsedInput.id })
+    revalidatePath(`/dashboard/forms/${parsedInput.formId}/edit`)
+    return result
+  })
+
+// Anonymous submission. Extra per-token rate-limit on top of the IP-based
+// publicAction limit so a single share can't be brute-forced into burning
+// its capacity (each rejected submit still consumes a rate-limit slot).
+export const submitPublicFormResponseAction = publicAction
+  .metadata({ actionName: "forms.submitPublicResponse" })
+  .inputSchema(submitPublicResponseSchema)
+  .action(async ({ parsedInput }) => {
+    if (apiRateLimit) {
+      const tokenKey = `action:forms.submitPublicResponse:token:${parsedInput.token.slice(0, 16)}`
+      const { success } = await apiRateLimit.limit(tokenKey)
+      if (!success) {
+        throw new ActionError("Too many attempts — try again in a moment.")
+      }
+    }
+    const result = await publicSubmitFormResponse(parsedInput)
     return result
   })

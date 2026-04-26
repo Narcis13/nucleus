@@ -69,8 +69,10 @@ type EventProps = {
   }
   form_submitted: BaseProps & {
     formId: string
+    // For public-share submissions, this is the share id (no assignment exists).
     assignmentId: string
-    clientId: string
+    // Null for anonymous public-share submissions.
+    clientId: string | null
   }
   invoice_created: BaseProps & {
     invoiceId: string

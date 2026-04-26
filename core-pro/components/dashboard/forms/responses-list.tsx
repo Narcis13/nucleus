@@ -61,7 +61,8 @@ export function ResponsesList({
                 >
                   <span className="flex flex-col">
                     <span className="text-sm font-medium text-foreground">
-                      {r.client?.fullName ?? "Unknown client"}
+                      {r.client?.fullName ??
+                        (r.shareId ? "Public submission" : "Unknown client")}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       Submitted {formatDate(r.submittedAt)}
