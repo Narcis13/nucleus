@@ -2,7 +2,7 @@
 
 import { Copy } from "lucide-react"
 import { useAction } from "next-safe-action/hooks"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -50,6 +50,26 @@ export function PublicShareDialog({
   const [maxResponses, setMaxResponses] = useState(1)
   const [expiresInDays, setExpiresInDays] = useState<number | "never">(30)
   const [createdUrl, setCreatedUrl] = useState<string | null>(null)
+
+  // Base UI's <Select.Value> shows the raw value (a UUID) unless the root
+  // Select gets an `items` prop mapping value → label.
+  const subjectClientItems = useMemo(
+    () => [
+      { value: "none", label: "No subject — agent only" },
+      ...clients.map((c) => ({ value: c.id, label: c.fullName })),
+    ],
+    [clients],
+  )
+  const expiresItems = useMemo(
+    () => [
+      { value: "1", label: "In 1 day" },
+      { value: "7", label: "In 7 days" },
+      { value: "30", label: "In 30 days" },
+      { value: "90", label: "In 90 days" },
+      { value: "never", label: "Never" },
+    ],
+    [],
+  )
 
   // Reset state each time the dialog re-opens so a previously-created URL
   // doesn't bleed into a new session.
@@ -140,6 +160,7 @@ export function PublicShareDialog({
                 onValueChange={(v) =>
                   setSubjectClientId(!v || v === "none" ? "" : v)
                 }
+                items={subjectClientItems}
               >
                 <SelectTrigger id="subject-client">
                   <SelectValue placeholder="No subject — agent only" />
@@ -185,6 +206,7 @@ export function PublicShareDialog({
                     if (!v) return
                     setExpiresInDays(v === "never" ? "never" : Number(v))
                   }}
+                  items={expiresItems}
                 >
                   <SelectTrigger id="expires-in">
                     <SelectValue />

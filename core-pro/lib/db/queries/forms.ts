@@ -390,9 +390,11 @@ export async function getExistingAssignmentsForClients(
 
 // Listed under the form's edit page so the pro can see active links and
 // revoke them. Joins the subject client (e.g. property owner) for display.
+// `tokenHash` (bytea / Uint8Array) is omitted — it isn't serializable across
+// the RSC → Client Component boundary, and the UI never needs it.
 export async function getFormPublicShares(formId: string): Promise<
   Array<
-    FormPublicShare & {
+    Omit<FormPublicShare, "tokenHash"> & {
       subjectClient: Pick<Client, "id" | "fullName"> | null
     }
   >
@@ -400,7 +402,16 @@ export async function getFormPublicShares(formId: string): Promise<
   return withRLS(async (tx) => {
     const rows = await tx
       .select({
-        share: formPublicShares,
+        id: formPublicShares.id,
+        formId: formPublicShares.formId,
+        professionalId: formPublicShares.professionalId,
+        subjectClientId: formPublicShares.subjectClientId,
+        subjectAppointmentId: formPublicShares.subjectAppointmentId,
+        maxResponses: formPublicShares.maxResponses,
+        responseCount: formPublicShares.responseCount,
+        expiresAt: formPublicShares.expiresAt,
+        revokedAt: formPublicShares.revokedAt,
+        createdAt: formPublicShares.createdAt,
         subjectClient: {
           id: clients.id,
           fullName: clients.fullName,
@@ -411,7 +422,7 @@ export async function getFormPublicShares(formId: string): Promise<
       .where(eq(formPublicShares.formId, formId))
       .orderBy(desc(formPublicShares.createdAt))
     return rows.map((r) => ({
-      ...r.share,
+      ...r,
       subjectClient: r.subjectClient?.id ? r.subjectClient : null,
     }))
   })

@@ -22,7 +22,7 @@ export function PublicSharesList({
 }: {
   formId: string
   shares: Array<
-    FormPublicShare & {
+    Omit<FormPublicShare, "tokenHash"> & {
       subjectClient: Pick<Client, "id" | "fullName"> | null
     }
   >
@@ -94,7 +94,7 @@ type StatusBadge = {
   variant: "default" | "secondary" | "outline" | "destructive"
 }
 
-function computeStatus(s: FormPublicShare): StatusBadge {
+function computeStatus(s: Omit<FormPublicShare, "tokenHash">): StatusBadge {
   if (s.revokedAt) return { label: "revoked", variant: "destructive" }
   if (s.expiresAt && s.expiresAt.getTime() < Date.now()) {
     return { label: "expired", variant: "secondary" }
@@ -105,9 +105,11 @@ function computeStatus(s: FormPublicShare): StatusBadge {
   return { label: "active", variant: "outline" }
 }
 
+// Pin the locale so SSR (Node) and hydration (browser) emit identical text;
+// `toLocaleDateString(undefined, …)` picks up host locale and diverges.
 function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
