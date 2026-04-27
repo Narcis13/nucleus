@@ -724,6 +724,7 @@ function PreviewBody({
               <TestimonialsSection
                 key={key}
                 section={config.sections.testimonials}
+                preview
               />
             )
           case "contact":
@@ -735,7 +736,13 @@ function PreviewBody({
               />
             )
           case "faq":
-            return <FaqSection key={key} section={config.sections.faq} />
+            return (
+              <FaqSection
+                key={key}
+                section={config.sections.faq}
+                preview
+              />
+            )
           case "blog":
             return <BlogSection key={key} section={config.sections.blog} />
           case "niche":

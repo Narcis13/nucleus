@@ -3,7 +3,7 @@ import "server-only"
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm"
 
 import { dbAdmin } from "@/lib/db/client"
-import { withRLS } from "@/lib/db/rls"
+import { withRLS, type Tx } from "@/lib/db/rls"
 import {
   clientTags,
   clients,
@@ -48,10 +48,27 @@ export async function listEmailCampaigns(): Promise<EmailCampaignListItem[]> {
       })
       .from(emailCampaigns)
       .orderBy(desc(emailCampaigns.createdAt))
-    return rows.map((r) => ({
-      campaign: r.campaign,
-      recipientCount: r.recipientCount ?? 0,
-    }))
+    // For sent/sending campaigns the recipients table is the source of truth.
+    // For unsent campaigns it's empty, so resolve the audience descriptor to
+    // surface the *projected* reach instead of a misleading 0.
+    return Promise.all(
+      rows.map(async (r) => {
+        const stored = r.recipientCount ?? 0
+        const hasRecipients =
+          r.campaign.status === "sent" ||
+          r.campaign.status === "sending" ||
+          r.campaign.status === "failed"
+        const recipientCount = hasRecipients
+          ? stored
+          : (
+              await resolveAudienceTx(
+                tx,
+                r.campaign.audience as EmailCampaignAudience,
+              )
+            ).length
+        return { campaign: r.campaign, recipientCount }
+      }),
+    )
   })
 }
 
@@ -127,67 +144,72 @@ export type ResolvedRecipient = {
   clientId: string | null
 }
 
+async function resolveAudienceTx(
+  tx: Tx,
+  audience: EmailCampaignAudience,
+): Promise<ResolvedRecipient[]> {
+  if (audience.type === "all_clients") {
+    const rows = await tx
+      .select({
+        id: clients.id,
+        email: clients.email,
+        fullName: clients.fullName,
+        status: professionalClients.status,
+      })
+      .from(professionalClients)
+      .innerJoin(clients, eq(clients.id, professionalClients.clientId))
+    return rows
+      .filter((r) => r.status === "active")
+      .map((r) => ({
+        email: r.email,
+        fullName: r.fullName,
+        clientId: r.id,
+      }))
+  }
+  if (audience.type === "status") {
+    const rows = await tx
+      .select({
+        id: clients.id,
+        email: clients.email,
+        fullName: clients.fullName,
+      })
+      .from(professionalClients)
+      .innerJoin(clients, eq(clients.id, professionalClients.clientId))
+      .where(eq(professionalClients.status, audience.status))
+    return rows.map((r) => ({
+      email: r.email,
+      fullName: r.fullName,
+      clientId: r.id,
+    }))
+  }
+  if (audience.type === "tag") {
+    const rows = await tx
+      .select({
+        id: clients.id,
+        email: clients.email,
+        fullName: clients.fullName,
+      })
+      .from(clientTags)
+      .innerJoin(clients, eq(clients.id, clientTags.clientId))
+      .where(eq(clientTags.tagId, audience.tagId))
+    return rows.map((r) => ({
+      email: r.email,
+      fullName: r.fullName,
+      clientId: r.id,
+    }))
+  }
+  if (audience.type === "leads_all") {
+    // Leads don't have a 1:1 client_id, so return nulls; the merge tag
+    // substitution falls back to the lead's own name when it has one.
+    return []
+  }
+  return []
+}
+
 export async function resolveAudience(
   audience: EmailCampaignAudience,
 ): Promise<ResolvedRecipient[]> {
-  return withRLS(async (tx) => {
-    if (audience.type === "all_clients") {
-      const rows = await tx
-        .select({
-          id: clients.id,
-          email: clients.email,
-          fullName: clients.fullName,
-          status: professionalClients.status,
-        })
-        .from(professionalClients)
-        .innerJoin(clients, eq(clients.id, professionalClients.clientId))
-      return rows
-        .filter((r) => r.status === "active")
-        .map((r) => ({
-          email: r.email,
-          fullName: r.fullName,
-          clientId: r.id,
-        }))
-    }
-    if (audience.type === "status") {
-      const rows = await tx
-        .select({
-          id: clients.id,
-          email: clients.email,
-          fullName: clients.fullName,
-        })
-        .from(professionalClients)
-        .innerJoin(clients, eq(clients.id, professionalClients.clientId))
-        .where(eq(professionalClients.status, audience.status))
-      return rows.map((r) => ({
-        email: r.email,
-        fullName: r.fullName,
-        clientId: r.id,
-      }))
-    }
-    if (audience.type === "tag") {
-      const rows = await tx
-        .select({
-          id: clients.id,
-          email: clients.email,
-          fullName: clients.fullName,
-        })
-        .from(clientTags)
-        .innerJoin(clients, eq(clients.id, clientTags.clientId))
-        .where(eq(clientTags.tagId, audience.tagId))
-      return rows.map((r) => ({
-        email: r.email,
-        fullName: r.fullName,
-        clientId: r.id,
-      }))
-    }
-    if (audience.type === "leads_all") {
-      // Leads don't have a 1:1 client_id, so return nulls; the merge tag
-      // substitution falls back to the lead's own name when it has one.
-      return []
-    }
-    return []
-  })
+  return withRLS((tx) => resolveAudienceTx(tx, audience))
 }
 
 // Called from the send action after Resend returns. Uses `dbAdmin` because the

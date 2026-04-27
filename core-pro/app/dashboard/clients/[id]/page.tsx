@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ChevronLeft, Mail, Phone } from "lucide-react"
 
+import { SetBreadcrumbLabel } from "@/components/dashboard/breadcrumb-context"
 import { ClientProfileTabs } from "@/components/dashboard/clients/client-profile-tabs"
 import { PageHeader } from "@/components/shared/page-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -49,6 +50,7 @@ export default async function ClientProfilePage({
 
   return (
     <div className="flex flex-col gap-6">
+      <SetBreadcrumbLabel segment={id} label={client.fullName} />
       <div>
         <Button
           variant="ghost"

@@ -231,7 +231,12 @@ export function InvoiceBuilder({
             onValueChange={(v) => setClientId(v ?? "")}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Pick a client" />
+              <SelectValue placeholder="Pick a client">
+                {(value: string | null) => {
+                  const c = value ? clients.find((c) => c.id === value) : null
+                  return c ? `${c.fullName} · ${c.email}` : "Pick a client"
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {clients.map((c) => (
@@ -250,7 +255,15 @@ export function InvoiceBuilder({
             onValueChange={(v) => setAppointmentId(v === "none" || !v ? "" : v)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="No appointment" />
+              <SelectValue placeholder="No appointment">
+                {(value: string | null) => {
+                  if (!value || value === "none") return "No appointment"
+                  const a = appointments.find((a) => a.id === value)
+                  return a
+                    ? `${a.title} · ${new Date(a.startAtIso).toLocaleDateString()}`
+                    : "No appointment"
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No appointment</SelectItem>

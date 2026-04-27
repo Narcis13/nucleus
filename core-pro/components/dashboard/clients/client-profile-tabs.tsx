@@ -19,6 +19,13 @@ import { toast } from "sonner"
 import { MessageInput } from "@/components/shared/chat/message-input"
 import { MessageThread } from "@/components/shared/chat/message-thread"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { updateClientAction } from "@/lib/actions/clients"
@@ -141,10 +148,10 @@ export function ClientProfileTabs({
             </div>
           </div>
           <aside className="flex flex-col gap-4">
-            <OverviewCard
-              label="Status"
-              value={relationship.status}
-              sub={relationship.source ?? "No source"}
+            <StatusOverviewCard
+              clientId={client.id}
+              status={relationship.status}
+              source={relationship.source}
             />
             <OverviewCard
               label="Started"
@@ -257,6 +264,66 @@ export function ClientProfileTabs({
         </div>
       </TabsContent>
     </Tabs>
+  )
+}
+
+const STATUS_OPTIONS = ["active", "inactive", "archived"] as const
+
+function StatusOverviewCard({
+  clientId,
+  status,
+  source,
+}: {
+  clientId: string
+  status: string
+  source: string | null
+}) {
+  const [value, setValue] = useState(status)
+  useEffect(() => {
+    setValue(status)
+  }, [status])
+
+  const action = useAction(updateClientAction, {
+    onSuccess: () => toast.success("Status updated."),
+    onError: ({ error }) => {
+      toast.error(error.serverError ?? "Couldn't update status.")
+      setValue(status)
+    },
+  })
+
+  const options = Array.from(new Set([...STATUS_OPTIONS, status]))
+
+  return (
+    <div className="rounded-md border border-border bg-card p-3">
+      <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+        Status
+      </p>
+      <div className="mt-1">
+        <Select
+          value={value}
+          onValueChange={(next) => {
+            if (!next || next === value) return
+            setValue(next)
+            action.execute({ id: clientId, status: next })
+          }}
+          disabled={action.isExecuting}
+        >
+          <SelectTrigger size="sm" className="w-full capitalize">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((s) => (
+              <SelectItem key={s} value={s} className="capitalize">
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {source ?? "No source"}
+      </p>
+    </div>
   )
 }
 
