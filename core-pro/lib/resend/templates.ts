@@ -24,6 +24,9 @@ import InvoiceReminderEmail, {
 import InvoiceSentEmail, {
   type InvoiceSentEmailProps,
 } from "@/emails/invoice-sent"
+import LeadMagnetClaimEmail, {
+  type LeadMagnetClaimEmailProps,
+} from "@/emails/lead-magnet-claim"
 import LeadNotificationEmail, {
   type LeadNotificationEmailProps,
 } from "@/emails/lead-notification"
@@ -54,6 +57,7 @@ export type EmailTemplateMap = {
   "new-message": NewMessageEmailProps
   "form-assigned": FormAssignedEmailProps
   "lead-notification": LeadNotificationEmailProps
+  "lead-magnet-claim": LeadMagnetClaimEmailProps
   "invoice-sent": InvoiceSentEmailProps
   "invoice-reminder": InvoiceReminderEmailProps
   "weekly-summary": WeeklySummaryEmailProps
@@ -131,6 +135,12 @@ export const TEMPLATES: Registry = {
       makeEmailTranslator(d.locale)("emails.leadNotification.subject", {
         name: d.leadName,
       }),
+  },
+  "lead-magnet-claim": {
+    render: (d) => LeadMagnetClaimEmail(d),
+    // Plain English subject — no translation key yet (the body uses a fixed
+    // copy too). When we add `emails.leadMagnetClaim.*` keys this can switch.
+    subject: (d) => `Confirm your download — ${d.magnetTitle}`,
   },
   "invoice-sent": {
     render: (d) => InvoiceSentEmail(d),

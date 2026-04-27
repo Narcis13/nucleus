@@ -323,7 +323,11 @@ function AudiencePicker({
           }
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value) =>
+                AUDIENCE_STATUSES.find((s) => s.value === value)?.label ?? ""
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {AUDIENCE_STATUSES.map((s) => (
@@ -341,7 +345,9 @@ function AudiencePicker({
           onValueChange={(v) => v && onChange({ type: "tag", tagId: v })}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value) => tags.find((t) => t.id === value)?.name ?? ""}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {tags.map((t) => (

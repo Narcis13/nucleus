@@ -233,11 +233,11 @@ export const deleteLeadMagnetAction = authedAction
     return result
   })
 
-// Public action — the micro-site's lead-magnet form posts here. We create a
-// lead in the pro's pipeline and return a short-lived signed URL. The file
-// itself lives in the public `marketing` bucket, but we keep the signed URL
-// because (a) we want the download to count in the same flow, and (b) it gives
-// us a thin layer of rate-limiting via the URL expiry.
+// Public action — the micro-site's lead-magnet form posts here. Double opt-in:
+// we mint a single-use claim ticket, email the visitor a confirmation link,
+// and return `{ ok: true, sent: true }`. The lead/activity/download rows are
+// created later by `/m/claim/[token]` when the visitor clicks through, so
+// no revalidation of the pro's dashboard is needed at this step.
 export const requestLeadMagnetAction = publicAction
   .metadata({ actionName: "marketing.requestLeadMagnet" })
   .inputSchema(requestLeadMagnetSchema)
@@ -248,13 +248,10 @@ export const requestLeadMagnetAction = publicAction
       )
       if (!success) {
         throw new ActionError(
-          "You're downloading too quickly — try again in a minute.",
+          "You're requesting too quickly — try again in a minute.",
         )
       }
     }
 
-    const result = await requestLeadMagnet(parsedInput)
-    revalidatePath("/dashboard/leads")
-    revalidatePath("/dashboard/marketing")
-    return result
+    return requestLeadMagnet(parsedInput)
   })

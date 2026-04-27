@@ -105,7 +105,7 @@ export function EmailCampaignsTab({
               </Button>
             }
           />
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>New email campaign</DialogTitle>
               <DialogDescription>
@@ -201,7 +201,7 @@ export function EmailCampaignsTab({
           if (!open) setEditing(null)
         }}
       >
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit campaign</DialogTitle>
             <DialogDescription>

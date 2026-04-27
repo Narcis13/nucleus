@@ -1,6 +1,6 @@
 import "server-only"
 
-import { getPlan, planLimitsFor } from "@/lib/stripe/plans"
+import { FEATURE_GATING_ENABLED, getPlan, planLimitsFor } from "@/lib/stripe/plans"
 import type { PlanLimits } from "@/types/domain"
 
 // Storage bucket + signed-URL TTL constants shared across the documents
@@ -12,6 +12,7 @@ export function resolvePlanLimits(
   planLimits: unknown,
   planId: string | null | undefined,
 ): PlanLimits {
+  if (!FEATURE_GATING_ENABLED) return planLimitsFor(getPlan(planId))
   if (planLimits && typeof planLimits === "object") {
     return planLimits as PlanLimits
   }

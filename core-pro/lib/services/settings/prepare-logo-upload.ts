@@ -1,7 +1,7 @@
 import "server-only"
 
 import { getProfessional } from "@/lib/db/queries/professionals"
-import { getPlan, planAtLeast } from "@/lib/stripe/plans"
+import { FEATURE_GATING_ENABLED, getPlan, planAtLeast } from "@/lib/stripe/plans"
 
 import type { ServiceContext } from "../_lib/context"
 import { PlanLimitError, UnauthorizedError } from "../_lib/errors"
@@ -25,7 +25,7 @@ export async function prepareLogoUpload(
   const professional = await getProfessional()
   if (!professional) throw new UnauthorizedError()
   const plan = getPlan(professional.plan)
-  if (!planAtLeast(plan.id, "growth")) {
+  if (FEATURE_GATING_ENABLED && !planAtLeast(plan.id, "growth")) {
     throw new PlanLimitError("Upload a logo on the Growth plan or higher.")
   }
   const extMatch = input.filename.match(/\.([a-z0-9]+)$/i)

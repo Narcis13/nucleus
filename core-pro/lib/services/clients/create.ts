@@ -7,7 +7,7 @@ import {
 } from "@/lib/db/queries/clients"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { trackServerEvent } from "@/lib/posthog/events"
-import { getPlan, planLimitsFor } from "@/lib/stripe/plans"
+import { FEATURE_GATING_ENABLED, getPlan, planLimitsFor } from "@/lib/stripe/plans"
 import type { PlanLimits } from "@/types/domain"
 
 import type { ServiceContext } from "../_lib/context"
@@ -17,6 +17,7 @@ function resolvePlanLimits(
   planLimits: unknown,
   planId: string | null | undefined,
 ): PlanLimits {
+  if (!FEATURE_GATING_ENABLED) return planLimitsFor(getPlan(planId))
   if (planLimits && typeof planLimits === "object") {
     return planLimits as PlanLimits
   }

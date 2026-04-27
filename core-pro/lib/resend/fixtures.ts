@@ -91,6 +91,13 @@ export const SAMPLE_FIXTURES: FixtureMap = {
     leadUrl: `${brand.appUrl}/dashboard/leads/sample-lead`,
     capturedAtIso: new Date(Date.now() - HOUR).toISOString(),
   }),
+  "lead-magnet-claim": (brand) => ({
+    ...brand,
+    recipientName: "Andrei Stoica",
+    magnetTitle: "Your free real-estate buyer's checklist",
+    claimUrl: `${brand.appUrl}/m/claim/sample-token`,
+    expiresInMinutes: 30,
+  }),
   "invoice-sent": (brand) => ({
     ...brand,
     invoiceNumber: "INV-2026-0042",

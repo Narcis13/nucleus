@@ -28,6 +28,7 @@ export async function createSocialTemplate(
   const professional = await getProfessional()
   if (!professional) throw new UnauthorizedError("Complete onboarding first.")
   const created = await createSocialTemplateQuery({
+    professionalId: professional.id,
     name: input.name,
     layout: input.layout,
     platform: input.platform,

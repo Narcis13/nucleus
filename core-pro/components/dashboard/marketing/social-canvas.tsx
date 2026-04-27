@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useImperativeHandle, useRef } from "react"
+import { useEffect, useImperativeHandle, useRef, useState } from "react"
 
 import type { SocialTemplateDesign } from "@/types/domain"
 
@@ -28,6 +28,10 @@ export type SocialCanvasProps = {
   // Cap the on-screen width so the canvas stays tidy inside the editor; the
   // bitmap is still rendered at `width × height` for a clean export.
   displayMaxWidth?: number
+  // Defer mounting the underlying <canvas> until the placeholder scrolls into
+  // view. Each canvas allocates a width×height backing bitmap (~4.5MB at
+  // 1080²), so a grid of 30+ cards otherwise burns ~150MB up-front.
+  lazy?: boolean
   ref?: React.Ref<SocialCanvasHandle>
 }
 
@@ -37,9 +41,29 @@ export function SocialCanvas({
   design,
   professionalName,
   displayMaxWidth = 420,
+  lazy = false,
   ref,
 }: SocialCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const placeholderRef = useRef<HTMLDivElement | null>(null)
+  const [mounted, setMounted] = useState(!lazy)
+
+  useEffect(() => {
+    if (mounted) return
+    const node = placeholderRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setMounted(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: "200px" },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [mounted])
 
   useImperativeHandle(
     ref,
@@ -56,6 +80,7 @@ export function SocialCanvas({
   )
 
   useEffect(() => {
+    if (!mounted) return
     const canvas = canvasRef.current
     if (!canvas) return
     canvas.width = width
@@ -63,24 +88,31 @@ export function SocialCanvas({
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     drawSocialDesign(ctx, { width, height, design, professionalName })
-  }, [width, height, design, professionalName])
+  }, [mounted, width, height, design, professionalName])
 
   // Preserve aspect ratio on screen; browser scales the high-res bitmap down.
   const ratio = height / width
   const displayWidth = Math.min(displayMaxWidth, width)
   const displayHeight = displayWidth * ratio
+  const frameStyle = {
+    width: `${displayWidth}px`,
+    height: `${displayHeight}px`,
+    borderRadius: 12,
+    boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
+  } as const
 
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        width: `${displayWidth}px`,
-        height: `${displayHeight}px`,
-        borderRadius: 12,
-        boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
-      }}
-    />
-  )
+  if (!mounted) {
+    return (
+      <div
+        ref={placeholderRef}
+        style={frameStyle}
+        className="animate-pulse bg-muted"
+        aria-hidden="true"
+      />
+    )
+  }
+
+  return <canvas ref={canvasRef} style={frameStyle} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

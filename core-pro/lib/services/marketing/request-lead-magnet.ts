@@ -1,18 +1,23 @@
 import "server-only"
 
-import { asc, eq } from "drizzle-orm"
+import { createHash, randomBytes } from "node:crypto"
+
+import { eq } from "drizzle-orm"
 
 import { dbAdmin } from "@/lib/db/client"
 import {
+  createLeadMagnetClaim,
   getPublishedLeadMagnet,
-  recordLeadMagnetDownload,
 } from "@/lib/db/queries/marketing"
 import { getProfessionalIdForPublishedSlug } from "@/lib/db/queries/micro-sites"
-import { leadActivities, leadStages, leads } from "@/lib/db/schema"
-import { getSupabaseAdmin } from "@/lib/supabase/admin"
+import { professionals } from "@/lib/db/schema"
+import { env } from "@/lib/env"
+import { sendEmail } from "@/lib/resend/client"
+import { getPlan } from "@/lib/stripe/plans"
+import type { Branding } from "@/types/domain"
 
 import { NotFoundError, ServiceError } from "../_lib/errors"
-import { LEAD_MAGNET_SIGNED_URL_TTL, MARKETING_BUCKET } from "./_lib"
+import { LEAD_MAGNET_CLAIM_TTL_MS } from "./_lib"
 
 export type RequestLeadMagnetInput = {
   slug: string
@@ -24,19 +29,25 @@ export type RequestLeadMagnetInput = {
   website?: string
 }
 
-export type RequestLeadMagnetResult = { ok: true; url: string | null }
+export type RequestLeadMagnetResult = { ok: true; sent: boolean }
 
-// Public-action service — invoked from the micro-site lead-magnet form. There
-// is no RLS-scoped Tx and no Clerk session: writes go through `dbAdmin`
-// because the row inserts (lead, activity, download) predate any RLS-eligible
-// identity. The honeypot short-circuit lives here so any future non-action
-// caller (cron import, MCP tool) gets the same spam guard.
+// ─────────────────────────────────────────────────────────────────────────────
+// requestLeadMagnet
+//
+// Public-action service. Double opt-in: the form submission no longer creates
+// a lead — it only mints a single-use `lead_magnet_claims` row keyed by
+// sha256(token), and emails the visitor a `/m/claim/<token>` link. The lead +
+// activity + download record are created when (and only when) the link is
+// clicked, which proves the address is reachable.
+//
+// Honeypot short-circuit returns `{ sent: false }` — bots don't get any
+// signal that they were filtered.
+// ─────────────────────────────────────────────────────────────────────────────
 export async function requestLeadMagnet(
   input: RequestLeadMagnetInput,
 ): Promise<RequestLeadMagnetResult> {
-  // Honeypot short-circuit — mirrors submitContactFormAction.
   if (input.website && input.website.trim().length > 0) {
-    return { ok: true, url: null }
+    return { ok: true, sent: false }
   }
 
   const resolved = await getProfessionalIdForPublishedSlug(input.slug)
@@ -47,82 +58,68 @@ export async function requestLeadMagnet(
     throw new NotFoundError("That download isn't available.")
   }
 
-  // Resolve the first non-won / non-lost stage for this pro's pipeline.
-  const stageRows = await dbAdmin
+  // Pull the bits of the professional we need for the branded email shell.
+  const proRows = await dbAdmin
     .select({
-      id: leadStages.id,
-      isWon: leadStages.isWon,
-      isLost: leadStages.isLost,
+      id: professionals.id,
+      fullName: professionals.fullName,
+      branding: professionals.branding,
+      locale: professionals.locale,
+      plan: professionals.plan,
     })
-    .from(leadStages)
-    .where(eq(leadStages.professionalId, resolved.professionalId))
-    .orderBy(asc(leadStages.position))
-  const firstStage =
-    stageRows.find((s) => !s.isWon && !s.isLost) ?? stageRows[0]
-  if (!firstStage) {
-    throw new ServiceError(
-      "The professional hasn't set up their pipeline yet — try again later.",
-    )
+    .from(professionals)
+    .where(eq(professionals.id, resolved.professionalId))
+    .limit(1)
+  const pro = proRows[0]
+  if (!pro) {
+    throw new ServiceError("That download isn't available right now.")
   }
 
-  const [lead] = await dbAdmin
-    .insert(leads)
-    .values({
-      professionalId: resolved.professionalId,
-      stageId: firstStage.id,
-      fullName: input.fullName,
-      email: input.email,
-      phone: input.phone || null,
-      source: "lead-magnet",
-      notes: `Downloaded "${magnet.title}"`,
-      metadata: {
-        slug: input.slug,
-        lead_magnet_id: magnet.id,
-        micro_site_id: resolved.siteId,
-      },
-    })
-    .returning()
+  const rawToken = randomBytes(32).toString("base64url")
+  const tokenHash = createHash("sha256").update(rawToken).digest()
+  const expiresAt = new Date(Date.now() + LEAD_MAGNET_CLAIM_TTL_MS)
+  const expiresInMinutes = Math.round(LEAD_MAGNET_CLAIM_TTL_MS / 60000)
 
-  if (lead) {
-    await dbAdmin.insert(leadActivities).values({
-      leadId: lead.id,
-      type: "created",
-      description: `Lead magnet download — ${magnet.title}`,
-      metadata: { source: "lead-magnet", leadMagnetId: magnet.id },
-    })
-  }
-
-  await recordLeadMagnetDownload({
+  await createLeadMagnetClaim({
     leadMagnetId: magnet.id,
+    professionalId: pro.id,
     email: input.email,
     fullName: input.fullName,
     phone: input.phone || null,
-    leadId: lead?.id ?? null,
+    slug: input.slug,
+    tokenHash,
+    expiresAt,
   })
 
-  // Mint a short-lived signed URL even though the bucket is public — it lets
-  // the browser trigger a straightforward download with the original
-  // filename. If signing fails (misconfigured bucket etc.) we still return
-  // the public URL as a fallback.
-  let url: string | null = null
-  try {
-    const admin = getSupabaseAdmin()
-    const { data } = await admin.storage
-      .from(MARKETING_BUCKET)
-      .createSignedUrl(magnet.fileKey, LEAD_MAGNET_SIGNED_URL_TTL, {
-        download: magnet.fileName,
-      })
-    url = data?.signedUrl ?? null
-  } catch (err) {
-    console.error(err, { tags: { action: "marketing.requestLeadMagnet" } })
-  }
-  if (!url) {
-    const admin = getSupabaseAdmin()
-    const { data } = admin.storage
-      .from(MARKETING_BUCKET)
-      .getPublicUrl(magnet.fileKey)
-    url = data.publicUrl
+  const claimUrl = new URL(`/m/claim/${rawToken}`, env.NEXT_PUBLIC_APP_URL).toString()
+
+  const result = await sendEmail({
+    to: input.email,
+    template: "lead-magnet-claim",
+    tenantId: pro.id,
+    plan: getPlan(pro.plan).id,
+    data: {
+      professionalName: pro.fullName,
+      branding: (pro.branding ?? null) as Branding | null,
+      appUrl: env.NEXT_PUBLIC_APP_URL,
+      locale: pro.locale,
+      recipientName: input.fullName,
+      magnetTitle: magnet.title,
+      claimUrl,
+      expiresInMinutes,
+    },
+  })
+
+  if (!result.sent) {
+    if (result.reason === "no_resend") {
+      throw new ServiceError(
+        "Email delivery isn't configured — the professional needs to add a Resend API key before downloads work.",
+      )
+    }
+    throw new ServiceError(
+      "We couldn't send the confirmation email — please try again in a minute.",
+    )
   }
 
-  return { ok: true, url }
+  return { ok: true, sent: true }
 }

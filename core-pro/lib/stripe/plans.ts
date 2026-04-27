@@ -123,6 +123,11 @@ export const PLANS: Record<PlanId, Plan> = {
 
 export const PLAN_ORDER: PlanId[] = ["starter", "growth", "pro", "enterprise"]
 
+// Boilerplate stage: feature gating is OFF so every CRM surface is reachable
+// without a Stripe subscription. Flip to `true` (or rip out the bypass paths
+// that read it) when verticals start enforcing plan tiers.
+export const FEATURE_GATING_ENABLED = false
+
 export function isPlanId(value: string | null | undefined): value is PlanId {
   return !!value && (PLAN_ORDER as readonly string[]).includes(value)
 }
@@ -156,6 +161,13 @@ export function planLimitsFor(plan: Plan): {
   max_storage_mb: number
   features: string[]
 } {
+  if (!FEATURE_GATING_ENABLED) {
+    return {
+      max_clients: UNLIMITED,
+      max_storage_mb: UNLIMITED,
+      features: ENTERPRISE_FEATURES,
+    }
+  }
   return {
     max_clients: Number.isFinite(plan.maxClients) ? plan.maxClients : UNLIMITED,
     max_storage_mb: Number.isFinite(plan.maxStorageMb) ? plan.maxStorageMb : UNLIMITED,

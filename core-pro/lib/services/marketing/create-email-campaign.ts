@@ -33,6 +33,7 @@ export async function createEmailCampaign(
   }
 
   const campaign = await createEmailCampaignQuery({
+    professionalId: professional.id,
     name: input.name,
     templateKey: input.templateKey,
     subject: input.subject,

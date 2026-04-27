@@ -36,3 +36,17 @@ Errors thrown from services are typed (`lib/services/_lib/errors.ts`); the actio
 
 **Migration state:** rollout started 2026-04-25. Pilot domain: `clients`. Other domains in `lib/actions/` may still hold inline logic — that's expected during rollout, not a license to add new inline logic. Phased plan and rollout history: `core-pro/docs/services-extraction-plan.md`.
 <!-- END:services-architecture -->
+
+<!-- BEGIN:feature-gating -->
+# Feature gating is OFF during the boilerplate stage
+
+`lib/stripe/plans.ts` exports `FEATURE_GATING_ENABLED` (currently `false`, set 2026-04-27). While this flag is off, every plan/feature gate in the codebase is a no-op so all CRM surfaces are reachable without a Stripe subscription.
+
+**Why:** nucleus is the common-ground boilerplate — verticals (real estate first) will enforce plan tiers later. Until then we need to test every feature end-to-end without paywalling ourselves.
+
+**How to apply:**
+- Don't add new gates that bypass the flag. New gate sites must wrap their check with `if (FEATURE_GATING_ENABLED) { ... }`, or read limits via the existing flag-aware `resolvePlanLimits` helpers (`lib/services/{marketing,documents}/_lib*.ts` and the local copy in `lib/services/clients/create.ts`).
+- The pricing page (`app/(marketing)/pricing/page.tsx`) and the billing comparison table read `PLANS[id]` directly — those still show per-tier features and are **intentionally** not flagged. Don't "fix" them.
+- `getPlan(professional.plan)` still returns the user's real tier so billing UI is honest. Don't override `getPlan` itself.
+- To re-enable gating when going vertical: flip the constant in `lib/stripe/plans.ts` to `true`. That's the only change needed.
+<!-- END:feature-gating -->

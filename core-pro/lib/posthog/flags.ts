@@ -1,7 +1,13 @@
 import "server-only"
 
 import { getPostHogServer } from "@/lib/posthog/server"
-import { getPlan, planAtLeast, type PlanFeature, type PlanId } from "@/lib/stripe/plans"
+import {
+  FEATURE_GATING_ENABLED,
+  getPlan,
+  planAtLeast,
+  type PlanFeature,
+  type PlanId,
+} from "@/lib/stripe/plans"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Feature flag registry — the set of flag keys the app knows how to ask
@@ -130,6 +136,7 @@ export function passesPlanGate(
   flag: FeatureFlag,
   planId: PlanId | null | undefined,
 ): boolean {
+  if (!FEATURE_GATING_ENABLED) return true
   const minPlan = PLAN_REQUIREMENTS[flag]
   const requiredFeature = FEATURE_REQUIREMENTS[flag]
 

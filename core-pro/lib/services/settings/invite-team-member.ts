@@ -3,7 +3,7 @@ import "server-only"
 import { clerkClient } from "@clerk/nextjs/server"
 
 import { getProfessional } from "@/lib/db/queries/professionals"
-import { getPlan, planAtLeast } from "@/lib/stripe/plans"
+import { FEATURE_GATING_ENABLED, getPlan, planAtLeast } from "@/lib/stripe/plans"
 
 import type { ServiceContext } from "../_lib/context"
 import {
@@ -28,7 +28,7 @@ export async function inviteTeamMember(
   const professional = await getProfessional()
   if (!professional) throw new UnauthorizedError()
   const plan = getPlan(professional.plan)
-  if (!planAtLeast(plan.id, "pro")) {
+  if (FEATURE_GATING_ENABLED && !planAtLeast(plan.id, "pro")) {
     throw new PlanLimitError("Team management requires the Pro plan.")
   }
   if (!professional.clerkOrgId) {

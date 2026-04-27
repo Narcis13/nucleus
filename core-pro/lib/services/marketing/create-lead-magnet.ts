@@ -51,6 +51,7 @@ export async function createLeadMagnet(
   }
 
   const created = await createLeadMagnetQuery({
+    professionalId: professional.id,
     title: input.title,
     description: input.description ?? null,
     fileKey: input.fileKey,
