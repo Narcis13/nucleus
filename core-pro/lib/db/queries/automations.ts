@@ -3,7 +3,13 @@ import "server-only"
 import { desc, eq, inArray, sql } from "drizzle-orm"
 
 import { withRLS } from "@/lib/db/rls"
-import { automationLogs, automations } from "@/lib/db/schema"
+import {
+  automationLogs,
+  automations,
+  clients,
+  leads,
+  professionalClients,
+} from "@/lib/db/schema"
 import type { Automation, AutomationLog } from "@/types/domain"
 import type {
   AutomationAction,
@@ -149,5 +155,41 @@ export async function listRecentLogsForAutomations(
       .where(inArray(automationLogs.automationId, automationIds))
       .orderBy(desc(automationLogs.executedAt))
       .limit(automationIds.length * perAutomation)
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sample targets — used by the "Run now" picker so the pro can dry-run an
+// automation against a real lead/client without waiting for the trigger to
+// fire naturally.
+// ─────────────────────────────────────────────────────────────────────────────
+export type SampleTarget = { id: string; fullName: string; email: string | null }
+
+export async function listSampleTargets(
+  limit = 25,
+): Promise<{ leads: SampleTarget[]; clients: SampleTarget[] }> {
+  return withRLS(async (tx) => {
+    const [leadRows, clientRows] = await Promise.all([
+      tx
+        .select({
+          id: leads.id,
+          fullName: leads.fullName,
+          email: leads.email,
+        })
+        .from(leads)
+        .orderBy(desc(leads.createdAt))
+        .limit(limit),
+      tx
+        .select({
+          id: clients.id,
+          fullName: clients.fullName,
+          email: clients.email,
+        })
+        .from(professionalClients)
+        .innerJoin(clients, eq(clients.id, professionalClients.clientId))
+        .orderBy(desc(professionalClients.createdAt))
+        .limit(limit),
+    ])
+    return { leads: leadRows, clients: clientRows }
   })
 }

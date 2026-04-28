@@ -8,14 +8,16 @@ import { getStages } from "@/lib/db/queries/leads"
 import {
   listAutomations,
   listRecentLogsForAutomations,
+  listSampleTargets,
 } from "@/lib/db/queries/automations"
 
 export default async function AutomationsPage() {
-  const [automations, tags, forms, stages] = await Promise.all([
+  const [automations, tags, forms, stages, sampleTargets] = await Promise.all([
     listAutomations(),
     getTags(),
     getForms(),
     getStages(),
+    listSampleTargets(),
   ])
   const recentLogs = await listRecentLogsForAutomations(
     automations.map((a) => a.automation.id),
@@ -35,6 +37,8 @@ export default async function AutomationsPage() {
           tags={tags.map((t) => ({ id: t.id, name: t.name, color: t.color }))}
           forms={forms.map((f) => ({ id: f.id, title: f.title }))}
           stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+          sampleLeads={sampleTargets.leads}
+          sampleClients={sampleTargets.clients}
           emptyState={
             <EmptyState
               icon={<Zap />}
@@ -66,6 +70,8 @@ export default async function AutomationsPage() {
           tags={tags.map((t) => ({ id: t.id, name: t.name, color: t.color }))}
           forms={forms.map((f) => ({ id: f.id, title: f.title }))}
           stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+          sampleLeads={sampleTargets.leads}
+          sampleClients={sampleTargets.clients}
         />
       )}
     </div>

@@ -201,7 +201,9 @@ export function AutomationBuilder({
           }
         >
           <SelectTrigger className="w-full">
-            <SelectValue />
+            <SelectValue>
+              {(v: TriggerType) => TRIGGER_LABELS[v]}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {TRIGGER_TYPES.map((t) => (
@@ -251,7 +253,11 @@ export function AutomationBuilder({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(v: "daily" | "weekly" | "monthly") =>
+                    v === "daily" ? "Daily" : v === "monthly" ? "Monthly" : "Weekly"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Daily</SelectItem>
@@ -280,7 +286,13 @@ export function AutomationBuilder({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(v: string) =>
+                    v === "__any__"
+                      ? "Any form"
+                      : (lookup.forms.find((f) => f.id === v)?.title ?? "Any form")
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__any__">Any form</SelectItem>
@@ -321,7 +333,13 @@ export function AutomationBuilder({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder="Any">
+                  {(v: string) =>
+                    v === "__any__"
+                      ? "Any tag"
+                      : (lookup.tags.find((t) => t.id === v)?.name ?? "Any tag")
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__any__">Any tag</SelectItem>
@@ -351,7 +369,17 @@ export function AutomationBuilder({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder="Any">
+                  {(v: string) =>
+                    v === "active"
+                      ? "Active"
+                      : v === "paused"
+                        ? "Paused"
+                        : v === "archived"
+                          ? "Archived"
+                          : "Any status"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__any__">Any status</SelectItem>
@@ -379,7 +407,17 @@ export function AutomationBuilder({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder="Any">
+                  {(v: string) =>
+                    v === "starter"
+                      ? "Starter"
+                      : v === "growth"
+                        ? "Growth"
+                        : v === "pro"
+                          ? "Pro"
+                          : "Any plan"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__any__">Any plan</SelectItem>
@@ -509,7 +547,7 @@ function ActionEditor({
   switch (action.type) {
     case "send_email":
       return (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-end">
           <div className="flex flex-col gap-1">
             <Label>Email template</Label>
             <Select
@@ -519,7 +557,12 @@ function ActionEditor({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(v: string) =>
+                    Object.values(CAMPAIGN_TEMPLATES).find((t) => t.key === v)
+                      ?.name ?? v
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {Object.values(CAMPAIGN_TEMPLATES).map((t) => (
@@ -577,7 +620,13 @@ function ActionEditor({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a form" />
+                <SelectValue placeholder="Choose a form">
+                  {(v: string) =>
+                    v === "__none__"
+                      ? "—"
+                      : (lookup.forms.find((f) => f.id === v)?.title ?? "—")
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">—</SelectItem>
@@ -619,7 +668,13 @@ function ActionEditor({
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Choose a tag" />
+              <SelectValue placeholder="Choose a tag">
+                {(v: string) =>
+                  v === "__none__"
+                    ? "—"
+                    : (lookup.tags.find((t) => t.id === v)?.name ?? "—")
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">—</SelectItem>
@@ -644,7 +699,13 @@ function ActionEditor({
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Choose a stage" />
+              <SelectValue placeholder="Choose a stage">
+                {(v: string) =>
+                  v === "__none__"
+                    ? "—"
+                    : (lookup.stages.find((s) => s.id === v)?.name ?? "—")
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">—</SelectItem>

@@ -1,20 +1,14 @@
 import "server-only"
 
-import { dbAdmin } from "@/lib/db/client"
 import {
-  bumpCampaignSentCounter,
-  finalizeCampaignSend,
   getEmailCampaign,
   insertRecipients,
-  markRecipientSent,
   resolveAudience,
   updateEmailCampaign as updateEmailCampaignQuery,
 } from "@/lib/db/queries/marketing"
 import { getProfessional } from "@/lib/db/queries/professionals"
 import { env } from "@/lib/env"
-import { expandMergeTags, type MergeTagContext } from "@/lib/marketing/templates"
-import { trackServerEvent } from "@/lib/posthog/events"
-import { fromAddress, getResend } from "@/lib/resend/client"
+import { getResend } from "@/lib/resend/client"
 import type { EmailCampaignAudience } from "@/types/domain"
 
 import type { ServiceContext } from "../_lib/context"
@@ -25,14 +19,19 @@ import {
   UnauthorizedError,
 } from "../_lib/errors"
 import { maxRecipientsForPlan, resolvePlanLimits } from "./_lib"
+import { processCampaignSend } from "./process-campaign-send"
 
 export type SendCampaignInput = { id: string }
-export type SendCampaignResult = { delivered: number; total: number }
+export type SendCampaignResult = { enqueued: number; total: number }
 
-// Resolves the campaign's audience, substitutes merge tags per-recipient, and
-// fires via Resend. Delivery is best-effort: per-recipient failures are logged
-// and recorded on `email_campaign_recipients.error` — the overall send only
-// fails on systemic errors (no API key, over plan limits).
+// Validates the send, pre-inserts a queued recipient row per audience member,
+// flips the campaign to "sending", and hands off to a Trigger.dev task. The
+// task drains the queued rows via `processCampaignSend` and finalizes the
+// campaign — the request returns immediately so a 1k-recipient send doesn't
+// block the action handler past the platform timeout.
+//
+// Falls back to inline send when `TRIGGER_SECRET_KEY` isn't configured (local
+// dev without trigger.dev running) so behavior matches a fresh checkout.
 export async function sendCampaign(
   _ctx: ServiceContext,
   input: SendCampaignInput,
@@ -49,9 +48,14 @@ export async function sendCampaign(
   if (campaign.status === "sent") {
     throw new ServiceError("This campaign has already been sent.")
   }
+  if (campaign.status === "sending") {
+    throw new ServiceError("This campaign is already being sent.")
+  }
 
-  const resend = getResend()
-  if (!resend) {
+  // Resend availability is checked here so a misconfigured workspace fails
+  // synchronously with a clear error instead of silently queuing rows that
+  // the worker would later mark as errored.
+  if (!getResend()) {
     throw new ServiceError(
       "Email sending isn't configured. Add RESEND_API_KEY to your environment.",
     )
@@ -72,13 +76,6 @@ export async function sendCampaign(
     )
   }
 
-  // Mark the campaign as sending so the UI reflects it immediately.
-  await updateEmailCampaignQuery(campaign.id, { status: "sending" })
-
-  // Pre-insert recipient rows so we always have a per-recipient audit trail,
-  // even when a row later fails to deliver. `dbAdmin` bypasses RLS (we're
-  // already inside an authed action, and the insert is scoped to our
-  // campaign id).
   const rows = recipients.map((r) => ({
     campaignId: campaign.id,
     email: r.email,
@@ -87,84 +84,17 @@ export async function sendCampaign(
     status: "queued" as const,
   }))
   await insertRecipients(rows)
+  await updateEmailCampaignQuery(campaign.id, { status: "sending" })
 
-  // Fetch the rows we just inserted so we can update them by id after send.
-  const inserted = await dbAdmin.query.emailCampaignRecipients.findMany({
-    where: (t, { eq: eqOp }) => eqOp(t.campaignId, campaign.id),
-  })
-  const byEmail = new Map(inserted.map((r) => [r.email, r]))
-
-  const from = fromAddress()
-  const ctxBase: MergeTagContext = {
-    professional_name: professional.fullName,
-    portal_url: `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/portal`,
-    booking_url: `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/portal/calendar`,
-    site_url: env.NEXT_PUBLIC_APP_URL,
+  if (!env.TRIGGER_SECRET_KEY) {
+    // No background worker available — drain inline so dev environments
+    // without trigger.dev still finish the send.
+    const result = await processCampaignSend(campaign.id)
+    return { enqueued: result.delivered, total: result.total }
   }
 
-  let delivered = 0
-  for (const recipient of recipients) {
-    const row = byEmail.get(recipient.email)
-    if (!row) continue
+  const { tasks } = await import("@trigger.dev/sdk")
+  await tasks.trigger("marketing.send-campaign", { campaignId: campaign.id })
 
-    const subject = expandMergeTags(campaign.subject, {
-      ...ctxBase,
-      client_name: recipient.fullName,
-    })
-    const html = expandMergeTags(campaign.bodyHtml, {
-      ...ctxBase,
-      client_name: recipient.fullName,
-    })
-
-    try {
-      const { data, error } = await resend.emails.send({
-        from,
-        to: [recipient.email],
-        subject,
-        html,
-        headers: {
-          "X-Entity-Ref-ID": `campaign:${campaign.id}:${row.id}`,
-        },
-        tags: [
-          { name: "campaign_id", value: campaign.id },
-          { name: "professional_id", value: professional.id },
-        ],
-      })
-      if (error || !data) {
-        await markRecipientSent({
-          id: row.id,
-          error: error?.message ?? "Unknown delivery error",
-        })
-        continue
-      }
-      await markRecipientSent({
-        id: row.id,
-        resendMessageId: data.id,
-      })
-      delivered += 1
-      // Flush counter every 25 sends so the UI progresses even on long runs.
-      if (delivered % 25 === 0) {
-        await bumpCampaignSentCounter(campaign.id, 25)
-      }
-    } catch (err) {
-      console.error(err, { tags: { action: "marketing.sendCampaign" } })
-      await markRecipientSent({
-        id: row.id,
-        error: err instanceof Error ? err.message : "Unknown error",
-      })
-    }
-  }
-
-  await finalizeCampaignSend(campaign.id, delivered)
-
-  void trackServerEvent("email_campaign_sent", {
-    distinctId: professional.clerkUserId,
-    professionalId: professional.id,
-    plan: professional.plan,
-    campaignId: campaign.id,
-    delivered,
-    total: recipients.length,
-  })
-
-  return { delivered, total: recipients.length }
+  return { enqueued: recipients.length, total: recipients.length }
 }

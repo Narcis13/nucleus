@@ -1,0 +1,172 @@
+{
+  "build": {
+  },
+  "cliPackageVersion": "4.4.4",
+  "config": {
+    "dirs": [
+      "./trigger/jobs"
+    ],
+    "project": "proj_esnombbkcxsjsofpsiim"
+  },
+  "configPath": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger.config.mjs",
+  "contentHash": "9fa81e3248354ca5299f08ce606e7cbc",
+  "customConditions": [
+  ],
+  "deploy": {
+    "env": {
+    }
+  },
+  "environment": "dev",
+  "externals": [
+    {
+      "name": "import-in-the-middle",
+      "version": "1.11.0"
+    }
+  ],
+  "files": [
+    {
+      "entry": "trigger/jobs/appointments.ts",
+      "out": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/appointments.mjs"
+    },
+    {
+      "entry": "trigger/jobs/automation-runner.ts",
+      "out": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/automation-runner.mjs"
+    },
+    {
+      "entry": "trigger/jobs/campaigns.ts",
+      "out": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/campaigns.mjs"
+    },
+    {
+      "entry": "trigger/jobs/inactive-client-checker.ts",
+      "out": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/inactive-client-checker.mjs"
+    },
+    {
+      "entry": "trigger/jobs/invoices.ts",
+      "out": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/invoices.mjs"
+    }
+  ],
+  "indexWorkerEntryPoint": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs",
+  "otelImportHook": {
+    "include": [
+    ]
+  },
+  "outputHashes": {
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs": "S1kM4p4IFnY",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs.map": "FKE5apQ0AOM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs": "KNpwi8ySGKI",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs.map": "2+HbqneC6K4",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-3OYPF3ZS.mjs": "HhlkOz89tok",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-3OYPF3ZS.mjs.map": "y/fRxxL6uM8",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-3VTTNDYQ.mjs": "4BFFwYbGU2A",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-3VTTNDYQ.mjs.map": "ileZ64FgkTs",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-4AC5RDQC.mjs": "8il3jk9Tpj0",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-4AC5RDQC.mjs.map": "IvKcXdsESCU",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-4MIBX6SK.mjs": "oYOAkKynFHY",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-4MIBX6SK.mjs.map": "8REaqY7TB9c",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-5FLGYLYZ.mjs": "Aiql4kuf/v4",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-5FLGYLYZ.mjs.map": "dD4cdwkoBW0",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-6H3L52BW.mjs": "EAvfaDlUV3Y",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-6H3L52BW.mjs.map": "Y9t3pNGOCsg",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-BH5TO44N.mjs": "67FC908kBmw",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-BH5TO44N.mjs.map": "8w57SitRV0Q",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-EBOKGHWJ.mjs": "xJLyJ+HTxbs",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-EBOKGHWJ.mjs.map": "1oLnq4DnhQM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-EXKTB4IK.mjs": "92dcYq9Kur4",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-EXKTB4IK.mjs.map": "a5q/qX9qtjg",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-K445XYSS.mjs": "6ZZNiTFp+Ag",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-K445XYSS.mjs.map": "oApTVznN4/Y",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-K6V5PMDA.mjs": "ApMeS64sGqY",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-K6V5PMDA.mjs.map": "cWlUKm6seYc",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-O6KEYEYL.mjs": "ZdB3OuLvXEQ",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-O6KEYEYL.mjs.map": "puiKmoOtRwc",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-SGHGXB55.mjs": "szDU67PDn4w",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-SGHGXB55.mjs.map": "GCzvPjvpxKc",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-SZ6GL6S4.mjs": "PQqDyI4/mbI",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-SZ6GL6S4.mjs.map": "LMPzUuAiOIM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-UOTQOTHC.mjs": "bDhSuf5JQZM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-UOTQOTHC.mjs.map": "0Cw09J3DtlA",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-YBODE3O7.mjs": "+S4/L55iAx8",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/chunk-YBODE3O7.mjs.map": "dWirdJvaST0",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/crypto.node-KKQBIZYC.mjs": "avSsy66zgAY",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/crypto.node-KKQBIZYC.mjs.map": "5Kd4HvgIawI",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/crypto.node-SMGKTDKN.mjs": "6DOFQiL2fGk",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/crypto.node-SMGKTDKN.mjs.map": "0b4tlwmkM3g",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/esm-2YWHC6L4.mjs": "CPq9Q1V4Fz0",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/esm-2YWHC6L4.mjs.map": "VON93E1In1A",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/esm-4Q3JH7IT.mjs": "TOxwrpPiQig",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/esm-4Q3JH7IT.mjs.map": "gj8v8i+y/rw",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-bsd-CGJT2UV3.mjs": "CwWsWht+aTo",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-bsd-CGJT2UV3.mjs.map": "FxfhEOa8Svo",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-darwin-EC26PHRL.mjs": "AZbzsvrDoJ8",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-darwin-EC26PHRL.mjs.map": "pMX6IDWn3sk",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-linux-RC66NAR6.mjs": "IXbe7IOULqo",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-linux-RC66NAR6.mjs.map": "cCi4mGu0ubA",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-unsupported-IQDRYROR.mjs": "TbNy+Ye2ohk",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-unsupported-IQDRYROR.mjs.map": "Dzc8V7mQv88",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-win-377JFQD3.mjs": "qGqgsZHQ+RI",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/getMachineId-win-377JFQD3.mjs.map": "j2vmXva5ZqU",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/headers-LKCET6YB.mjs": "jn4RSOz3yLE",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/headers-LKCET6YB.mjs.map": "eP8XTpTrJTA",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/middleware-location-L4CBVQHE.mjs": "QOmMzqHsc/o",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/middleware-location-L4CBVQHE.mjs.map": "EeCSK1NVcUg",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger.config.mjs": "S9jtiLkTbo4",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger.config.mjs.map": "xByUxIuENLA",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/appointments.mjs": "BNyNOn0IO8o",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/appointments.mjs.map": "Iad8c+aVMpM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/automation-runner.mjs": "dZaole8jlU0",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/automation-runner.mjs.map": "1iZFCZeDP0Y",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/campaigns.mjs": "0x/SRoLIBoQ",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/campaigns.mjs.map": "yVZG90zy6iA",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/inactive-client-checker.mjs": "6eta1me8O7s",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/inactive-client-checker.mjs.map": "GfK+2XIpNXA",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/invoices.mjs": "cIOhBHPLmtM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/newme/nucleus/core-pro/trigger/jobs/invoices.mjs.map": "mne+pZ7ll1U",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/node-3LCXHZLP.mjs": "mVr82H5Fyt4",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/node-3LCXHZLP.mjs.map": "MXhXGmv+ElM",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/s2s-XFHUVMA2.mjs": "/vMT7LOlL1s",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/s2s-XFHUVMA2.mjs.map": "PIXpC9vx69U",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/server.node-TXHJFIPK.mjs": "L42MnloCCcg",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/server.node-TXHJFIPK.mjs.map": "0rram1Rabls",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/v3-ID4MMCX6.mjs": "tHuL/+SahN4",
+    "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/v3-ID4MMCX6.mjs.map": "0b4tlwmkM3g"
+  },
+  "outputPath": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa",
+  "packageVersion": "4.4.4",
+  "runWorkerEntryPoint": "/Users/narcisbrindusescu/newme/nucleus/core-pro/.trigger/tmp/build-b7WgRa/.npm/_npx/f51a09bd0abf5f10/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs",
+  "runtime": "node",
+  "sources": {
+    "package.json": {
+      "contentHash": "e6149c0083f94f3a32a8f38cec05dec5",
+      "contents": "eJx1Vsty2yAU3ecrPF4XybLsOM6qi/Y3OoPhWqKWQAXkxOn033tBILCjrCyfc3S5b/T3abVaS9rD+nW1ZkoDGbRaf3PoFbQRSjpiU1TFZkIHLa7UOrnVI3jIMC0GaxD6i38R4HB1b0l4tyv3/G2CT6Po+ExM/wJlLNV2pqZ/geqE9AwY/xTQs9I99figwVoBekXImxYWVsW95pW1wC4PSo8lpb0NMMusYaiQ6mcv5uP46bUBCXqKfM21+PjogFyEXc14kvaiWVJGOAmH0bSPKo8libEjF+pRFNDoPpgpFR29YQ6a1q48lNGvo1hQYJyI57IWKAe+LA0cqv/5unMYQHKQTEBW/O8nagDNlhoo8279qopdaB/Hsw70pXSF/m08fSi2RTXTXHIXYuma0dPPRb1A94qLMxZzMnEsNtkJUWOUtvTUTWaqzZ2mVeriGgTdNKq7RkN79GU7izTl4n2OhXT0BJ2XocPFy1cy06kY97bYJZUnoaeiw+D6QUmQ1gQhTth2UaldivVCGifRwM9BEkS7Yp+JjMXRhHL6Ib9jsra5ZByoK1lpzGQBXdlkOUh8eIhmMAebOhPamihjSpBXkhUXrWH5Uv0slTje7BJy9WcEfQuZPx4zt9DjpgFd4P4IUlcxE2LcZXnNlYZfFhTjgEeatnTT1wk31pP/m6yGswa4iEWpD8kh1lFjyJVqQSUDQkfbKlw3txDkIbUo68z73CQJ7YNrVY5y9IicZQyrSudl0x6OqPG9TzR2cKB3+1QLwSaLLvPJZDcywYHkc/mSWFczh1Z77KBUMAcTXLxdcPFY3FOGnjEbzIab4tdLkfnhFbaFHmIz7IrnSA7K2EZD9BRN50yrmthoWIjnrDUiKxWHOLNVOnMOr3JLob6DCac3Mgh2CcOCwWQjFSSq/+pt14HkHFN+KA7Z3sJAcAzDwsqzblrKmQzZywbPKCmDG64TD+kqdLM64Y6YT7C4Dt4ErrYedAMha9mw2zdCpehdRzETM5eF9wYnEi8cfPM5HfmhePCvTuX5GHEgQkT7aT/Nm1/hvtTYS/naT/sIfZj8q/G1XX5fXH8sXxnprinjXYa+77Ne+x6jx9BK1wExxGwP4CVuyrkrtpsHJuv74xIVK/+Z/pS5+dDwUeJ76R4jTMmzaMgXY3Uvil8m8aLKLpc7qsaBrR8ZMnRjIyTJMjQvpe1j83xKm4/Qf8BNlfblevr39B8OSLlI"
+    },
+    "trigger.config.ts": {
+      "contentHash": "d6aae8f6337529f3819c03d3725264a9",
+      "contents": "eJxlT01Lw0AQvedXDHtSKEm0t1yqtLFEFCX0JhK22UncutkJk00olv53NzEVxMvu8L7mjW5aYgcnUFhpi2uyla7hDBVTA+LOsa5r5FDhEHXqMxqWIgjwOHm8Q/bG/XFenQKAlumApUvGocSuC9EO4S7Ptts0L17zl8d0vSvy9AFWKxCjuCiJ0Q9Fa2SJH2QUslj4JKW5S+BNhNFcJDrQvhPvI8e9dbrBBIQlhZPcUP2EAxqP+XGCGnnc9CydJpvAMo4nJ/o09MFjWQC0cm9QZXaDQwKVNB0uJmI+8KKbwu6dw6Z13rxcXFBtd74I9S6zz564iX/WzI5/3C9ZydIRJ3B7AVhaRY3+8kc57ucW5/Hzz/k6+AbzyoOy"
+    },
+    "trigger/jobs/appointments.ts": {
+      "contentHash": "0ddbd7a9a47eae03d9bb66bc9e43a750",
+      "contents": "eJzlVEFu20AMvPsVhE82aktom5OAFM2hh6C31g8wo6WthaVdYUlbEQIDeURemJeUu7JgJekPAhgxshwOh+SYtml9EHgCQT7AGXbBNzD/KcHu9xQyQ6eczWE+m9kRyOTMXdt666QhJ78atDVfM/PaPuRcVmSOtXX73HmxO1uiWO94PtJI35Jyvef5bZ2ZUFHizvGKWgdqFENBFeU5vL48f4ZPbHVz3QicbuD1+QUmc4FxLmAstyg6/5BpWsz8OyyDDDz0sL2shiaj/3PJ5cVyC11Fjk5KhO5NAcuRqwyEokw+aMWRymSw6TwYqrFnaGPuJHHx7aaCL/C1ggfa+UDAgkGWkY2wrKD1LIDAapaaYDReODrorFQa2SbiLfg2emgFogr1j+XBszurSiJbN7zTIATosY0R7cOA1u0wGM3wCcEVBu0i+SsZ+jqte0NqUYnKURI4odaiz7X2DrVOp07zD7RWmU6FxwIDMTYE1kQijUZmXqkwq32qXsYdRZyOtrEcO9b2xs1ln8nQupx4Bkq9CfL+oox23MTt3qYlL55moGMtYD5xFmcx8XoRVooJJKEv9LI0+HgncWfCBXyHcwoeXQHIvSth0WJfe1TGyAxTw97rI6sN3T5FDkpe/PdQafi8hNsfI0WH9kMvw3VcDIgPZS4isjfPqwt2KDxC4n9D5LxMX9rpMTjt1B8K/dUcCc5R0Gqm8X9RG5JV"
+    },
+    "trigger/jobs/automation-runner.ts": {
+      "contentHash": "6fa5e8a105226ec784d839356a9b6c45",
+      "contents": "eJzlVs2O2zYQvusppjrJgFdOgp4EuIm77SFAEATN3oIC5kpjizBFavmzXic1kIfIE+ZJMqQpi9qfBCjaUwADNsmZjzPffDM073qlLXwCy8xuDnvGLRxho1UH+Sur+XaLumzwdmGaXZ7xwRpvzlaN5h8/CrxQusuz0aK5XjUdlyPYQvDrRXO9qAVHaRMs5qzqmOVKvlFbM0/W5qG3qVvsWBrJHdbO4qr2DnPomTZxcd87wV2g3HKJZxh76JGwTn6XSlq8s9/x9uaGkl0s4OuXzz/Dx6d6NaoBbn+Fr5+/JKWCumVUbe2kJBMy9x5rvGXCMYvRtZitAeWNQ4cGlERYJ6yW5HsRUNYeBnrUQEdU78ZjjZYlXLXMBps9EzsDtkVgoXQguLHAZENKblECibnl1gCDtVf2OgBFpRhnepSNgVsej8uN0gUplx1MBW/hSNEaFdCl14Ox2ING4zqKnm0sag/njxsU7AB7blvl6EYlGi63dOle6R1loeiegZKVEPDH7xREjcaAMwS1jq2yDpRGqkI/mlOSEZfBpUC9A/IxnoafSX5Z6FCaD+8ts87AEvKojRz+gdzLjigPv2vV9QJtPNkwLuhnBPjLyUuvsHfsIBRrCOZTBom0XjcVlVkTFG0LtR3XhCWdELRdn8ZDNZ0W2THL8C4MEzIwQZ6rM2649IoqSjf6whb+Wk7g+aMNkM/pWKPVh4qmUsfuVtZi11uS5Qs4hkMnK2DmIGso+lMy1f3sZrD8LeQHMaQP42V/UyAsDPsovmAGUBoUWNtiNqz9CCySIM8H1F8aC7xJD0ve+Akcbi9TVmdnN8E7bovnpzXfQPHLaDeL0YbcnZaUu9pVsGHC4Jz2mFFyQtlFx6kVfN2ZiTkeAwIVY0ybxddgOXkckrjLaDEGFTdKQe+EbWG5XMKzJ6Kz2lFwfjZQdZ5N7/dQAx1BTSPGY+QTPa5vaFwW0ydxNp4btDShTGiCKtG9IWOz4TRNxh45Jn6PVMsjTwp2inCWJkAKPEdMwxGKlFFQm4HbMa+UvzL0nCcv99nmqdXAwIO5G139Is3g1HdcOjxvHbMp1OSfQMHOfwhO2cW2HRAH5++U6Kki/bhMDwuVDKUflOpfFGvM5mll3lN0lCnUfohCgVqPef+vlCQbMNITp/Rj3MwnHhSo0pX/Ak5KZLJGUuGffhde+u2SHmfDtggVvA+DO+SWgvxXXNtWq72/Mht2aTIT+DeIXTaP"
+    },
+    "trigger/jobs/campaigns.ts": {
+      "contentHash": "802e6c8551a290830c9a5b48d7db6612",
+      "contents": "eJzlVMtu2zAQvPsrBr7ERm0pQHupABcJ2h5ybf0BYsy1TFgiVXKlRA0M5CPyhfmSLvWwWyD9ggA6SOTM7O5gtKaqnWc8gVU44oS9dxXmN+xNUZBPNLVp0Mf5bGYmYO3djkL4qqpamcL+JKsvvLQ092kg3xrBpJXyR2Jji3QkrXcjax2EJqppiteX5/fwxFG3F1fRfsLr8wuoUqbEZAuiLQIQcMR/t78aakjjvkMerybTcxiL/D9eR+DZ6IRDHqXUnsljlPO0M7Uhy/DuIUB5Ej1RYtIJtgcawqC9klPwwQUagK1RUYsFEQ7C0sjfSEOOsSksflBspp8KH1CTX4sOmlorpuVq1LLYG6tK85tCL31ufXThTpNkj6XdDM6W3dBLYFOW4gorbsLmapjsKu+HGZsivUJwUDIv+y5KeQpNJWUeDiSwWKz21BrXiAnMUoZF19W1+PCeokmP/b+9czYw/s7ZNuZg08dh8TQDjM4wPyct+Sdp85UAeqcz2RKVerwdHA0ZPuIUL+XsW+MVG2czfL6+7gmNvKvQ2R0WtepKp3SkT6J38hVkGdkCpyU2XxC76Ms03r61iiaR5KKwFIrUPy1nfwCo0ENd"
+    },
+    "trigger/jobs/inactive-client-checker.ts": {
+      "contentHash": "453d15cae5d9bddfcf54d9349ea6ced6",
+      "contents": "eJzlVs1u4zYQvucppkKBlbaK7O0uCtStk6ZZFNhDb77HtDS22UikQ1Lxeg0De+oT5F1676PkSTokJYuyZfQBFglkkZz5OL/fiFcbqQzsQedrLOoSNRxgqWQF0W9G8dUKVVbg80gXj9EVb4WZKFLApxT0U3mULxT/8qXEa6mq6KqTLRZ3RcVFBzsq+WJULEZ5yVGYELU2smKGS6FT2Ci5RK1pwcp7J6nPIazRFQsg8JmVNTM486afaAQXjFCsuEAydDSC15ev38K/dXXW5RSeP8Dr1xcoGC93wAXLDX/Ga58WqgcmMtKwSn9IBcjyNXgRmHuZh1ZnHqQuhSUXhaZMoNq1Cg2mXFo0s0aQW8HFqpdk2K6lRigpe9p4RW7ILg2yLCiVZs2E1bUQ3XVvNMxbMz6ynZ6TiEK9Jp3USgsyh9buUp/yDGbH9zfaopVyBUpu7VVWbIPqmpSsfawuuAGjKEJtLKK7xrKola8k2asw9x5OrBDAv/94rMDB179fmjgoLH0VrvkGtGFUuvGylFIlPeUmFBUBsBVShoBBLgUFVjt1WKDZIrqogNlK2BASR91Y+ruSzAZO8xXdriHm4lnyHKm5ltSj9MM2G8mFqWxzJUAJJ0RgRYGFu1v90sZb14un2uVzQx7ZSnhE3GgXKtpw0iLfwULWgrSzb6mp8LPjHkoM5aotRc9Y92vMH1HNmH6EacewmaGNeH8FwIsJRAErZSddeJ17hCgl4VxJQeLvx/AzvLV/blfVtMn0TuQQJzC9AYsLjTlU1ZpuZltGZdwQsTsGyDSWmJs4adeWKOPAluPBdo0K42YFlvu7BdAUCJWyZmbMdhtMITrhiShJL2ty7TqL1IyqMZA8vnqL+BJi61dWUg+bNUynUxgn1FOmViIYARTaceq6377B4cppl2j8HoVl7HaoFyD24erMoUZ2wUuacLYBpeeSr0g3ML31+d6f3d7C/pBQSo6qACFD3U5A1NUCVXN66F1QkARMj4qG4kim+GuzEMb5HXmkCG4HRSbwftxDP3IjeSBwCx8pTrF9ZEJuqXyu/f1v4ccP9Php3D7ejcfj5KofCaoDXliGulBgXYntg6T7ivhEKRkY8Fl7GpZJybRpOXdiPzh+tQbfzFcKHT+GxQjw/X4Q18kWd+aQ9qRzyagfc+xjAJyuAbwrULHPcdXCPTCT+O+LTb0oeZ41TK2hOtPnQhAV/0V02wqHTK4hByq6POM2M1Xv7IEXZ2iuJUm87S+rdcHzJqKHMwzXyYQRarVIQXGHx+cwSXqy8X/x74knwSqZd1CH7sDT0gBmIHJCUGcU5ahmyKy+bylcdPvEzQtwNMlNTWM1GmK7kNDaTgqox35/2EY/dlUS0gdR3nckkYW9kNhGNFzU2JM7tvW5/E3X/wPKHf98ajiESuFPZtaZ+zQJA9qnjMs3Zis0M15hnCQw6kUwHiKYMELHVDpmOfmsj88GSwohyVjWnJxPnzAd/fxOLqc+HSQv6+oQWYXhG6xnP3t+mMK7Hv0302loiAWzrhlnToeYjGD/A4xz3iM="
+    },
+    "trigger/jobs/invoices.ts": {
+      "contentHash": "776a5d348af9abfe74e5721a29fa9c3b",
+      "contents": "eJzlVDtu20AQ7XWKBzWRAklUkcYCFARwmlQBEqcO19yhuNByl5hdkiEMAa5ygMAn1EkyS5NQ4SMYZEHOvHnzexhTN54jnhCKinRrKeCCkn2N5ZfI5nQi3mnqsqDPy8XCzGhu3feOWLd0X1FxJr5FZdY8ZsZ13hQUMv+K2havMOHIMlxfnt/Dm1p9uM0Q3Sdcn1+glbEDpglBt84Zd0LoiZqdhKSoH60L8E7cSuADVMT+7rDf49fD/Q5fvWwp9h6xksggVIIlNCqEA0prGig3JJo8kIt5lneGetL5nDMkaJRoMiz5pQYVSZzRI5/2lW+S26FX9gxlbWLzjRgm/41KOQ1tQqNiUaUYqKZh37BJnEy1cVrUQbU0jVXJhpy2Y3HXv/9QGq6nD6fsGqYUCmk2GompVHAfomRnUnrAI0n61NA8pG+aRI5RLGk+Y+pWm7i1/gRLHdkD8kYNtQB+z4UEGUIYscG3LPP1ZaKK3MYKpWf0KX2vwphJ/shtBCqNbHlalHev8aqmcTfCp+D81o/bezfapj/jKSi8EylNaphOws8kZRxvJ2UXVTivnhaA0QcsZ+3s5uMwan+5EX/B3glijzt8TM9olMkfoMLgCqzWOH5GYsKUmmms4wjVKxPfHqbVegQzxZbdhBbLZbO4rBf/ARB3RN4="
+    },
+    "tsconfig.json": {
+      "contentHash": "dc965bb8ce7664dfa13d7251664d9b39",
+      "contents": "eJx1UstOwzAQvOcrohyjkgIXJE5IqAcqKiQ4ogol8ao19Uu2E4Kq/jtrxyZNmp6imdnZ7M76mKRpVkuuKAP9piyVwmSP6RFpFGypd2ARZ6uP+9u7h2zR84xWSH56gJBIHpQeFNSCLisGAwtGQGczD7ehS8mY/Fm731ndQCDNgapXWj3voT5MFKtpbceckCtOJxyYjSQNgxeBU0g1FrmX3EZhohH/DkayxoXgKqpGEEwllmgntrA2Umxil7POFNXSAum1yVbfpnMdFfYA3cZcMipqDRyELdm4XrFmR/0lYsjH8HVLl9xvMCSapqdRsqq0++GMSDwt87NeSBRIBLRdDFXuJUiBA5lLw0ib8eKjuDT15Ez1XsrDzE8iPeOwvwpmHJGecZArA5HzmZIY38k53UlYQ+Df5lO+AdEWpLAmHi7Pl/kl7CIunClONi7tJQLtvOwhR5yEVTLopgNJAl88vDJXlpySP4zu7jw="
+    }
+  },
+  "target": "dev"
+}

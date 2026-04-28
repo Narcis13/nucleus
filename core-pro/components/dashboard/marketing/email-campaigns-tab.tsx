@@ -52,7 +52,7 @@ export function EmailCampaignsTab({
   const sendAction = useAction(sendCampaignAction, {
     onSuccess: ({ data }) => {
       toast.success(
-        `Delivered to ${data?.delivered ?? 0} of ${data?.total ?? 0} recipients.`,
+        `Queued ${data?.enqueued ?? 0} of ${data?.total ?? 0} recipients — sending in the background.`,
       )
       router.refresh()
     },

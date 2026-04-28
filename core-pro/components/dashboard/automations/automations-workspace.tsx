@@ -17,6 +17,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -43,12 +48,16 @@ import {
   type ReferenceData,
 } from "./shared"
 
+type SampleTarget = { id: string; fullName: string; email: string | null }
+
 type WorkspaceProps = {
   automations: AutomationListItem[]
   recentLogs: AutomationLogItem[]
   tags: ReferenceData["tags"]
   forms: ReferenceData["forms"]
   stages: ReferenceData["stages"]
+  sampleLeads?: SampleTarget[]
+  sampleClients?: SampleTarget[]
   emptyState?: React.ReactNode
 }
 
@@ -58,6 +67,8 @@ export function AutomationsWorkspace({
   tags,
   forms,
   stages,
+  sampleLeads = [],
+  sampleClients = [],
   emptyState,
 }: WorkspaceProps) {
   const router = useRouter()
@@ -213,15 +224,15 @@ export function AutomationsWorkspace({
                     >
                       Edit
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => runNow.execute({ id: a.id })}
-                      disabled={runNow.isPending}
-                    >
-                      <Play className="size-3.5" />
-                      Run now
-                    </Button>
+                    <RunNowPicker
+                      triggerType={a.triggerType as TriggerType}
+                      sampleLeads={sampleLeads}
+                      sampleClients={sampleClients}
+                      pending={runNow.isPending}
+                      onRun={(targetId) =>
+                        runNow.execute({ id: a.id, targetId })
+                      }
+                    />
                     <Button
                       size="sm"
                       variant="ghost"
@@ -346,6 +357,85 @@ export function AutomationsWorkspace({
         </DialogContent>
       </Dialog>
     </Tabs>
+  )
+}
+
+function RunNowPicker({
+  triggerType,
+  sampleLeads,
+  sampleClients,
+  pending,
+  onRun,
+}: {
+  triggerType: TriggerType
+  sampleLeads: SampleTarget[]
+  sampleClients: SampleTarget[]
+  pending: boolean
+  onRun: (targetId: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const targetsLead = triggerType === "new_lead"
+  const candidates = targetsLead ? sampleLeads : sampleClients
+  const targetLabel = targetsLead ? "lead" : "client"
+
+  const choose = (id: string | null) => {
+    setOpen(false)
+    onRun(id)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button size="sm" variant="outline" disabled={pending}>
+            <Play className="size-3.5" />
+            Run now
+          </Button>
+        }
+      />
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="border-b border-border px-3 py-2">
+          <p className="text-sm font-medium">Run with sample target</p>
+          <p className="text-xs text-muted-foreground">
+            Pick a {targetLabel} so target-dependent steps (email, tag, form)
+            actually fire.
+          </p>
+        </div>
+        <div className="flex max-h-72 flex-col overflow-y-auto py-1">
+          <button
+            type="button"
+            onClick={() => choose(null)}
+            className="flex flex-col items-start gap-0.5 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+          >
+            <span className="font-medium">No target</span>
+            <span className="text-xs text-muted-foreground">
+              Only notification / reminder steps will run.
+            </span>
+          </button>
+          {candidates.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              No recent {targetLabel}s to pick from.
+            </p>
+          ) : (
+            candidates.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => choose(c.id)}
+                className="flex flex-col items-start gap-0.5 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                <span className="truncate font-medium">{c.fullName}</span>
+                {c.email && (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {c.email}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
