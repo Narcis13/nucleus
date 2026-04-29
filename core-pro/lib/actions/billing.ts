@@ -2,19 +2,13 @@
 
 import { z } from "zod"
 
-import { getCurrentProfessionalId } from "@/lib/clerk/helpers"
-import {
-  ActionError,
-  authedAction,
-} from "@/lib/actions/safe-action"
-import {
-  createCheckoutSession,
-  createCustomerPortalSession,
-} from "@/lib/stripe/client"
+import { authedAction } from "@/lib/actions/safe-action"
+import { openCustomerPortal } from "@/lib/services/billing/open-customer-portal"
+import { startCheckout } from "@/lib/services/billing/start-checkout"
 // ─────────────────────────────────────────────────────────────────────────────
-// Billing actions — thin wrappers that resolve the current professional and
-// then delegate to `lib/stripe/client.ts`. Return a URL string; the caller
-// (client component) redirects with `window.location.href`.
+// Billing actions — thin wrappers that delegate to the billing services.
+// Return a URL string; the caller (client component) redirects with
+// `window.location.href`.
 //
 // We intentionally don't use `redirect()` inside the action body: Server
 // Actions returning a redirect force a full-page MPA transition, and Stripe
@@ -28,26 +22,13 @@ const startCheckoutSchema = z.object({
 export const startCheckoutAction = authedAction
   .metadata({ actionName: "billing.startCheckout" })
   .inputSchema(startCheckoutSchema)
-  .action(async ({ parsedInput }) => {
-    const professionalId = await getCurrentProfessionalId()
-    if (!professionalId) {
-      throw new ActionError("No professional profile found for your account.")
-    }
-    const url = await createCheckoutSession({
-      professionalId,
-      planId: parsedInput.planId,
-    })
-    return { url }
+  .action(async ({ parsedInput, ctx }) => {
+    return startCheckout(ctx, parsedInput)
   })
 
 export const openCustomerPortalAction = authedAction
   .metadata({ actionName: "billing.openCustomerPortal" })
   .inputSchema(z.object({}).optional())
-  .action(async () => {
-    const professionalId = await getCurrentProfessionalId()
-    if (!professionalId) {
-      throw new ActionError("No professional profile found for your account.")
-    }
-    const url = await createCustomerPortalSession({ professionalId })
-    return { url }
+  .action(async ({ ctx }) => {
+    return openCustomerPortal(ctx)
   })

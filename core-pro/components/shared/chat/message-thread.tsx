@@ -3,7 +3,10 @@
 import { useAction } from "next-safe-action/hooks"
 import { useEffect, useRef } from "react"
 
-import { markMessagesAsReadAction } from "@/lib/actions/messages"
+import {
+  markMessagesAsReadAction,
+  portalMarkMessagesAsReadAction,
+} from "@/lib/actions/messages"
 import { useMessages } from "@/hooks/use-realtime"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/types/domain"
@@ -21,22 +24,29 @@ import { TypingIndicator } from "./typing-indicator"
 // arrives so the unread badge clears while the thread is open.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Either auth flavour of the mark-read action — same input/output shape.
+type MarkReadAction =
+  | typeof markMessagesAsReadAction
+  | typeof portalMarkMessagesAsReadAction
+
 export function MessageThread({
   conversationId,
   initial,
   currentSenderId,
   otherPartyLabel,
   emptyState,
+  markReadAction = markMessagesAsReadAction,
 }: {
   conversationId: string
   initial: Message[]
   currentSenderId: string
   otherPartyLabel?: string
   emptyState?: string
+  markReadAction?: MarkReadAction
 }) {
   const { messages } = useMessages(conversationId, { initial })
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const { execute: markRead } = useAction(markMessagesAsReadAction)
+  const { execute: markRead } = useAction(markReadAction)
 
   // Scroll-to-bottom on new messages. `smooth` would fight ongoing user
   // scroll; we use instant scroll since the container only renders inside the

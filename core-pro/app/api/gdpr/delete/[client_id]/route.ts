@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server"
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import {
   clients,
@@ -9,7 +10,6 @@ import {
   professionalClients,
   professionals,
 } from "@/lib/db/schema"
-import { captureException } from "@/lib/sentry"
 import { getSupabaseAdmin } from "@/lib/supabase/admin"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,9 +103,11 @@ export async function POST(
         await admin.storage.from(bucket).remove(paths)
       }
     } catch (err) {
-      captureException(err, {
-        tags: { route: "gdpr.delete", bucket },
-        extra: { clientId: client_id, professionalId: professional.id },
+      logError(err, {
+        source: "route:gdpr.delete",
+        professionalId: professional.id,
+        clientId: client_id,
+        metadata: { bucket },
       })
     }
   }
@@ -120,9 +122,11 @@ export async function POST(
       const clerk = await clerkClient()
       await clerk.users.deleteUser(client.clerkUserId)
     } catch (err) {
-      captureException(err, {
-        tags: { route: "gdpr.delete", stage: "clerk" },
-        extra: { clientId: client_id },
+      logError(err, {
+        source: "route:gdpr.delete",
+        professionalId: professional.id,
+        clientId: client_id,
+        metadata: { stage: "clerk" },
       })
     }
   }

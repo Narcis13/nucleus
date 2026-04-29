@@ -1,9 +1,0 @@
-<%= render Ui::EmptyStateComponent.new(
-      icon: "🗂️",
-      title: "No leads yet",
-      description: "Leads land here as soon as your contact form or inbox import runs."
-    ) do |c| %>
-  <% c.with_action do %>
-    <%= render(Ui::ButtonComponent.new(variant: :primary, href: "#")) { "Create lead" } %>
-  <% end %>
-<% end %>

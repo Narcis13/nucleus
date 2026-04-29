@@ -2,8 +2,8 @@ import type Stripe from "stripe"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
+import { logError } from "@/lib/audit/log"
 import { env } from "@/lib/env"
-import { captureException } from "@/lib/sentry"
 import { stripe } from "@/lib/stripe/client"
 import {
   handleCheckoutCompleted,
@@ -21,8 +21,8 @@ import {
 // reject every request — webhooks cannot run unauthenticated.
 //
 // Handlers are idempotent (see lib/stripe/webhooks.ts); on error we return
-// 500 so Stripe retries. The full event payload goes to Sentry with the event
-// id for correlation.
+// 500 so Stripe retries. Failures land in `error_logs` via lib/audit/log
+// with the event id in metadata.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const secret = env.STRIPE_WEBHOOK_SECRET
@@ -43,7 +43,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     event = await stripe.webhooks.constructEventAsync(payload, signature, secret)
   } catch (err) {
-    captureException(err, { tags: { webhook: "stripe", stage: "verify" } })
+    logError(err, {
+      source: "webhook:stripe",
+      metadata: { stage: "verify" },
+    })
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
@@ -73,8 +76,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         break
     }
   } catch (err) {
-    captureException(err, {
-      tags: { webhook: "stripe", eventType: event.type, eventId: event.id },
+    logError(err, {
+      source: "webhook:stripe",
+      metadata: { eventType: event.type, eventId: event.id },
     })
     return NextResponse.json({ error: "Handler failed" }, { status: 500 })
   }

@@ -2,6 +2,7 @@ import "server-only"
 
 import { and, eq, inArray } from "drizzle-orm"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import { env } from "@/lib/env"
 import {
@@ -21,8 +22,8 @@ import {
   expandMergeTags,
   getCampaignTemplate,
 } from "@/lib/marketing/templates"
+import { resolveProfessionalBrand } from "@/lib/resend/brand"
 import { fromAddress, getResend } from "@/lib/resend/client"
-import { captureException } from "@/lib/sentry"
 
 import type {
   ActionContext,
@@ -223,7 +224,11 @@ export async function processAutomationChain(
         .where(eq(automationLogs.id, log.id))
     }
   } catch (err) {
-    captureException(err, { tags: { automation: "chain" } })
+    logError(err, {
+      source: "automation:chain",
+      professionalId: context.professionalId,
+      metadata: { automationId, logId: log?.id ?? null },
+    })
     if (log?.id) {
       await dbAdmin
         .update(automationLogs)
@@ -354,7 +359,11 @@ async function enqueueChain(args: {
     })
     return true
   } catch (err) {
-    captureException(err, { tags: { automation: "enqueue" } })
+    logError(err, {
+      source: "automation:enqueue",
+      professionalId: args.context.professionalId,
+      metadata: { automationId: args.automationId, logId: args.logId },
+    })
     return false
   }
 }
@@ -426,16 +435,21 @@ async function runSendNotification(
       .where(eq(professionals.id, context.professionalId))
       .limit(1)
     if (pro?.email) {
+      const brand = await resolveProfessionalBrand(context.professionalId)
       await resend.emails.send({
         from: fromAddress(),
         to: [pro.email],
         subject: action.title,
         react: NotificationEmail({
+          professionalName: brand?.professionalName ?? pro.fullName,
+          branding: brand?.branding ?? null,
+          unsubscribeUrl: brand?.unsubscribeUrl,
+          locale: brand?.locale,
           recipientName: pro.fullName,
           title: action.title,
           body: action.body ?? null,
           link: `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/dashboard/automations`,
-          appUrl: env.NEXT_PUBLIC_APP_URL,
+          appUrl: brand?.appUrl ?? env.NEXT_PUBLIC_APP_URL,
         }),
       })
     }

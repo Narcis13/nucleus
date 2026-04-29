@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -8,12 +9,21 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
 import { anonRole, authenticatedRole } from "drizzle-orm/supabase"
 
 import { createdAt, currentProfessionalIdSql, updatedAt } from "./_helpers"
 import { professionals } from "./professionals"
+
+// Postgres `bytea` mapped to Node Buffer — used for sha256(token) so the raw
+// magic-link token never lives at rest. Same pattern as `portal_invites`.
+const bytea = customType<{ data: Buffer; default: false }>({
+  dataType() {
+    return "bytea"
+  },
+})
 
 // ============================================================================
 // EMAIL CAMPAIGNS
@@ -201,3 +211,44 @@ export const leadMagnetDownloads = pgTable(
     }),
   ],
 )
+
+// ============================================================================
+// LEAD_MAGNET_CLAIMS — single-use magic-link tickets that double-opt-in the
+// visitor's email before the PDF is delivered. The form submit inserts a row
+// here (not a lead), an email goes out with `/m/claim/<token>`, and the
+// claim route atomically consumes the row to mint the lead + signed URL.
+//
+// Why a separate table (vs. extending lead_magnet_downloads): downloads only
+// represent successful completions; claims represent intent and stay around
+// until expiry (or claim) for auditability + retry safety. Same hash-only
+// token storage pattern as `portal_invites`.
+//
+// RLS: enabled, no permissive policy. Only the server (dbAdmin) reads/writes.
+// ============================================================================
+export const leadMagnetClaims = pgTable(
+  "lead_magnet_claims",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadMagnetId: uuid("lead_magnet_id")
+      .notNull()
+      .references(() => leadMagnets.id, { onDelete: "cascade" }),
+    professionalId: uuid("professional_id")
+      .notNull()
+      .references(() => professionals.id, { onDelete: "cascade" }),
+    // Captured at request time, replayed at claim time.
+    email: text("email").notNull(),
+    fullName: text("full_name").notNull(),
+    phone: text("phone"),
+    slug: text("slug").notNull(),
+    tokenHash: bytea("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    // Filled in when the claim is consumed and a lead row is minted.
+    leadId: uuid("lead_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("lead_magnet_claims_token_hash_idx").on(t.tokenHash),
+    index("lead_magnet_claims_magnet_idx").on(t.leadMagnetId),
+  ],
+).enableRLS()

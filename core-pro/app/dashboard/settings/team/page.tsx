@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getProfessional } from "@/lib/db/queries/professionals"
-import { getPlan, planAtLeast } from "@/lib/stripe/plans"
+import { FEATURE_GATING_ENABLED, getPlan, planAtLeast } from "@/lib/stripe/plans"
 
 import { TeamMembers } from "./members"
 
@@ -22,7 +22,7 @@ export default async function TeamSettingsPage() {
   if (!professional) redirect("/onboarding")
 
   const plan = getPlan(professional.plan)
-  const hasProPlan = planAtLeast(plan.id, "pro")
+  const hasProPlan = !FEATURE_GATING_ENABLED || planAtLeast(plan.id, "pro")
 
   if (!hasProPlan) {
     return (

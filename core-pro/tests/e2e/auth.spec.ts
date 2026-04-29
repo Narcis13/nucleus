@@ -49,7 +49,7 @@ test.describe("signed-out auth surfaces", () => {
     page,
   }) => {
     const response = await page.goto("/dashboard")
-    // Middleware (proxy.ts) calls auth.protect(), which bounces to sign-in.
+    // Middleware (middleware.ts) calls auth.protect(), which bounces to sign-in.
     // We accept any URL ending up on the sign-in page, with or without a
     // ?redirect_url hint.
     await expect(page).toHaveURL(/sign-in/, { timeout: 15_000 })

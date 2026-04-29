@@ -71,7 +71,7 @@ export function SocialTemplatesTab({
               </Button>
             }
           />
-          <DialogContent className="max-w-6xl">
+          <DialogContent className="sm:max-w-6xl">
             <DialogHeader>
               <DialogTitle>Design a social post</DialogTitle>
               <DialogDescription>
@@ -119,7 +119,7 @@ export function SocialTemplatesTab({
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}
       >
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Edit template</DialogTitle>
             <DialogDescription>
@@ -200,6 +200,7 @@ function TemplateCard({
           design={design}
           professionalName={professionalName}
           displayMaxWidth={280}
+          lazy
           ref={handle}
         />
         {template.caption && (

@@ -8,35 +8,38 @@ import {
 import { headers } from "next/headers"
 import { z } from "zod"
 
+import { logError } from "@/lib/audit/log"
+import { dbAdmin } from "@/lib/db/client"
+import { ServiceError } from "@/lib/services/_lib/errors"
 import { withRLS, type Tx } from "@/lib/db/rls"
+import { requirePortalSession } from "@/lib/portal-auth/session"
 import { apiRateLimit } from "@/lib/ratelimit"
-import { captureException } from "@/lib/sentry"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Base client — shared error handling, metadata schema, and Sentry reporting.
-// Every action factory below extends this. Keep this file the single source of
-// truth for action shape; route-specific behaviour goes into per-action `.use`.
+// Base client — shared error handling and metadata schema. Every action
+// factory below extends this. Keep this file the single source of truth for
+// action shape; route-specific behaviour goes into per-action `.use`.
 // ─────────────────────────────────────────────────────────────────────────────
 const baseClient = createSafeActionClient({
   defineMetadataSchema() {
-    // `actionName` is required so Sentry tags + ratelimit prefixes are useful.
+    // `actionName` is required so log tags + ratelimit prefixes are useful.
     return z.object({
       actionName: z.string(),
     })
   },
   handleServerError(error, utils) {
-    captureException(error, {
-      tags: {
-        actionName: utils.metadata?.actionName ?? "unknown",
-      },
-    })
-    if (process.env.NODE_ENV !== "production") {
-      console.error(
-        `[action:${utils.metadata?.actionName ?? "unknown"}]`,
-        error,
-      )
+    const actionName = utils.metadata?.actionName ?? "unknown"
+    // ActionError/ServiceError are user-facing (validation, auth, rate-limit)
+    // and don't deserve an error_logs row — they'd drown real signal.
+    const isExpected =
+      error instanceof ActionError || error instanceof ServiceError
+    if (!isExpected) {
+      logError(error, { source: `action:${actionName}` })
     }
-    if (error instanceof ActionError) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error(`[action:${actionName}]`, error)
+    }
+    if (isExpected) {
       return error.message
     }
     return DEFAULT_SERVER_ERROR_MESSAGE
@@ -76,7 +79,7 @@ async function ratelimitKey(prefix: string): Promise<string> {
 // ─────────────────────────────────────────────────────────────────────────────
 // publicAction — no auth required. Validates input via Zod, applies the
 // generic API ratelimit (skipped when Upstash is unconfigured locally), and
-// reports errors to Sentry.
+// records unexpected errors to `error_logs` via lib/audit/log.
 // ─────────────────────────────────────────────────────────────────────────────
 export const publicAction = baseClient.use(async ({ next, metadata }) => {
   if (apiRateLimit) {
@@ -124,5 +127,46 @@ export const authedAction = baseClient.use(async ({ next, metadata }) => {
         db: tx,
       } satisfies AuthedActionCtx,
     })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// portalAction — counterpart to `authedAction` for the client portal. Reads
+// the `nucleus_portal` cookie, validates the session, and injects
+// `{ clientId, professionalId, sessionId, db }` into ctx.
+//
+// Unlike `authedAction`, this **does not** open a `withRLS` transaction.
+// Portal queries scope explicitly on `client_id` / `professional_id` from the
+// session — RLS via Clerk JWT doesn't apply because the caller has no Clerk
+// session at all. The trust boundary is the cookie HMAC + the DB-backed
+// session row (`requirePortalSession`).
+//
+// Missing / tampered / expired cookie → `requirePortalSession` calls
+// `redirect('/portal/sign-in')`, which surfaces as a NEXT_REDIRECT to the
+// caller (the client component follows it on the next tick).
+// ─────────────────────────────────────────────────────────────────────────────
+export type PortalActionCtx = {
+  clientId: string
+  professionalId: string
+  sessionId: string
+  db: typeof dbAdmin
+}
+
+export const portalAction = baseClient.use(async ({ next, metadata }) => {
+  const session = await requirePortalSession()
+  if (apiRateLimit) {
+    const key = `action:${metadata.actionName}:portal:${session.clientId}`
+    const { success } = await apiRateLimit.limit(key)
+    if (!success) {
+      throw new ActionError("Rate limit exceeded — try again in a moment.")
+    }
+  }
+  return next({
+    ctx: {
+      clientId: session.clientId,
+      professionalId: session.professionalId,
+      sessionId: session.sessionId,
+      db: dbAdmin,
+    } satisfies PortalActionCtx,
   })
 })

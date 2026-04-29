@@ -37,7 +37,7 @@ export const SAMPLE_FIXTURES: FixtureMap = {
   "client-invitation": (brand) => ({
     ...brand,
     recipientName: "Maria Ionescu",
-    inviteUrl: `${brand.appUrl}/accept-invite/sample-token`,
+    inviteUrl: `${brand.appUrl}/portal/verify?token=sample-token`,
     expiresInDays: 7,
     customMessage: "Looking forward to working with you. Let me know if you have any questions before our first session.",
   }),
@@ -90,6 +90,13 @@ export const SAMPLE_FIXTURES: FixtureMap = {
       "Hi, I'd like to know more about your nutrition packages — specifically whether you offer remote consultations.",
     leadUrl: `${brand.appUrl}/dashboard/leads/sample-lead`,
     capturedAtIso: new Date(Date.now() - HOUR).toISOString(),
+  }),
+  "lead-magnet-claim": (brand) => ({
+    ...brand,
+    recipientName: "Andrei Stoica",
+    magnetTitle: "Your free real-estate buyer's checklist",
+    claimUrl: `${brand.appUrl}/m/claim/sample-token`,
+    expiresInMinutes: 30,
   }),
   "invoice-sent": (brand) => ({
     ...brand,

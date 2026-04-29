@@ -6,8 +6,6 @@ import { withRLS } from "@/lib/db/rls"
 import { clients, documents } from "@/lib/db/schema"
 import type { Client, Document } from "@/types/domain"
 
-import { getProfessional } from "./professionals"
-
 // ─────────────────────────────────────────────────────────────────────────────
 // DOCUMENTS
 // Metadata rows for files living in the `documents` Supabase Storage bucket.
@@ -90,37 +88,6 @@ export async function getDocument(
     const row = rows[0]
     if (!row) return null
     return { ...row.doc, client: row.client?.id ? row.client : null }
-  })
-}
-
-export async function createDocument(input: {
-  clientId?: string | null
-  name: string
-  fileUrl: string
-  fileType?: string | null
-  fileSize?: number | null
-  category?: string | null
-  metadata?: Record<string, unknown> | null
-}): Promise<Document> {
-  const professional = await getProfessional()
-  if (!professional) throw new Error("No professional context")
-  return withRLS(async (tx) => {
-    const [created] = await tx
-      .insert(documents)
-      .values({
-        professionalId: professional.id,
-        clientId: input.clientId ?? null,
-        uploadedBy: professional.id,
-        name: input.name,
-        fileUrl: input.fileUrl,
-        fileType: input.fileType ?? null,
-        fileSize: input.fileSize ?? null,
-        category: input.category ?? null,
-        metadata: input.metadata ?? null,
-      })
-      .returning()
-    if (!created) throw new Error("Failed to insert document")
-    return created
   })
 }
 

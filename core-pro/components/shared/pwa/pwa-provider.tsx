@@ -80,6 +80,25 @@ export function PwaProvider() {
     if (typeof window === "undefined") return
     if (!("serviceWorker" in navigator)) return
 
+    // In dev, never register the SW — it precaches HTML/assets and serves
+    // them across server restarts, which makes the page render a stale build.
+    // Also clean up any SW/caches a previous prod build left behind.
+    if (process.env.NODE_ENV !== "production") {
+      void (async () => {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.unregister()))
+        if ("caches" in window) {
+          const names = await caches.keys()
+          await Promise.all(
+            names
+              .filter((n) => n.startsWith("corepro-"))
+              .map((n) => caches.delete(n)),
+          )
+        }
+      })()
+      return
+    }
+
     let disposed = false
 
     const register = async () => {

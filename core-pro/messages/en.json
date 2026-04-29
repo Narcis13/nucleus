@@ -136,13 +136,15 @@
       "messages": "Messages",
       "forms": "Forms",
       "documents": "Documents",
+      "invoices": "Invoices",
       "progress": "Progress"
     },
     "header": {
       "defaultWorkspace": "Your workspace",
       "accountMenu": "Account menu",
       "profile": "Profile",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "signedIn": "Signed in"
     },
     "messages": {
       "title": "Messages",
@@ -155,6 +157,33 @@
     "forms": {
       "title": "Forms",
       "empty": "No forms assigned."
+    },
+    "invoices": {
+      "title": "Invoices",
+      "description": "Every invoice your professional has shared with you.",
+      "emptyTitle": "No invoices yet",
+      "emptyDescription": "Invoices your professional shares with you will show up here.",
+      "outstanding": "Outstanding",
+      "outstandingCount": "{count, plural, =0 {nothing pending} one {# invoice open} other {# invoices open}}",
+      "overdue": "Overdue",
+      "overdueCount": "{count, plural, =0 {none past due} one {# past due} other {# past due}}",
+      "paid": "Paid",
+      "paidCount": "{count, plural, =0 {no payments yet} one {# payment} other {# payments}}",
+      "columnInvoice": "Invoice",
+      "columnStatus": "Status",
+      "columnIssued": "Issued",
+      "columnDue": "Due",
+      "columnTotal": "Total",
+      "columnPaid": "Paid",
+      "download": "Download",
+      "downloadAriaLabel": "Download invoice {invoice}",
+      "status": {
+        "sent": "Sent",
+        "viewed": "Viewed",
+        "partial": "Partial",
+        "paid": "Paid",
+        "overdue": "Overdue"
+      }
     },
     "progress": {
       "title": "Progress",

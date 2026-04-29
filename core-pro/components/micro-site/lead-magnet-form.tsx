@@ -10,10 +10,10 @@ import type { LeadMagnet } from "@/types/domain"
 // ─────────────────────────────────────────────────────────────────────────────
 // <LeadMagnetForm>
 //
-// Inline form shown on the anonymous micro-site. On submit the server creates
-// a lead, records the download, and returns a short-lived signed URL that we
-// trigger with a hidden anchor — keeps the download attributed to the form
-// submission without opening a new tab on mobile.
+// Inline form shown on the anonymous micro-site. Double opt-in: submission
+// only mints a `lead_magnet_claims` row and emails the visitor a confirm
+// link. The lead in the pro's pipeline is created when the visitor clicks
+// the link in their inbox — fake/unreachable emails never get the PDF.
 // ─────────────────────────────────────────────────────────────────────────────
 export function LeadMagnetForm({
   slug,
@@ -26,25 +26,16 @@ export function LeadMagnetForm({
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [website, setWebsite] = useState("")
-  const [downloaded, setDownloaded] = useState(false)
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null)
 
   const { execute, isPending } = useAction(requestLeadMagnetAction, {
-    onSuccess: ({ data }) => {
-      if (data?.url) {
-        // Force a download by opening the signed URL. We can't set
-        // `download` reliably on a cross-origin response, but Supabase
-        // signed URLs honor the `download` query param we requested on the
-        // server so the browser downloads rather than previews.
-        const a = document.createElement("a")
-        a.href = data.url
-        a.rel = "noopener"
-        a.target = "_blank"
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
+    onSuccess: ({ data, input }) => {
+      // Honeypot path returns `sent: false`. We still flip to the confirmation
+      // view so a bot gets the same UX a human gets.
+      setSubmittedEmail(input.email)
+      if (data?.sent) {
+        toast.success("Check your inbox to confirm and download.")
       }
-      setDownloaded(true)
-      toast.success("Sent — your download should start shortly.")
       setFullName("")
       setEmail("")
       setPhone("")
@@ -56,7 +47,7 @@ export function LeadMagnetForm({
     },
   })
 
-  if (downloaded) {
+  if (submittedEmail) {
     return (
       <div
         className="rounded-lg p-4 text-sm"
@@ -65,7 +56,11 @@ export function LeadMagnetForm({
           color: "var(--ms-primary-fg)",
         }}
       >
-        Thanks — your download is on its way. I&apos;ll be in touch soon.
+        <p className="font-medium">Check your inbox.</p>
+        <p className="mt-1 opacity-90">
+          We sent a confirmation link to <strong>{submittedEmail}</strong>. Click
+          it within 30 minutes to start the download.
+        </p>
       </div>
     )
   }

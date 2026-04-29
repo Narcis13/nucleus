@@ -17,7 +17,15 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Eye, GripVertical, PenLine, Save, Send, Trash2 } from "lucide-react"
+import {
+  Eye,
+  GripVertical,
+  Link as LinkIcon,
+  PenLine,
+  Save,
+  Send,
+  Trash2,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAction } from "next-safe-action/hooks"
 import { useMemo, useState } from "react"
@@ -40,6 +48,7 @@ import type { Client } from "@/types/domain"
 import { AssignDialog } from "./assign-dialog"
 import { FieldEditor } from "./field-editor"
 import { FieldPalette } from "./field-palette"
+import { PublicShareDialog } from "./public-share-dialog"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // <FormBuilder>
@@ -73,6 +82,7 @@ export function FormBuilder({
   )
   const [mode, setMode] = useState<BuilderMode>("edit")
   const [assignOpen, setAssignOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -217,6 +227,15 @@ export function FormBuilder({
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setShareOpen(true)}
+            disabled={schema.fields.length === 0}
+          >
+            <LinkIcon className="size-3.5" />
+            Share publicly
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setAssignOpen(true)}
             disabled={schema.fields.length === 0}
           >
@@ -303,6 +322,12 @@ export function FormBuilder({
           assignAction.execute({ formId, clientIds, dueDate })
         }}
         pending={assignAction.isExecuting}
+      />
+      <PublicShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        formId={formId}
+        clients={clients}
       />
     </div>
   )

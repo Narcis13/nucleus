@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
 import { z } from "zod"
 
 import {
@@ -8,26 +9,17 @@ import {
   authedAction,
   publicAction,
 } from "@/lib/actions/safe-action"
-import { dbAdmin } from "@/lib/db/client"
-import {
-  AVAILABLE_THEMES,
-  ensureMicroSite,
-  getOwnMicroSite,
-  getProfessionalIdForPublishedSlug,
-  isSlugAvailable,
-  updateMicroSite,
-} from "@/lib/db/queries/micro-sites"
-import { getProfessional } from "@/lib/db/queries/professionals"
-import { leadActivities, leadStages, leads } from "@/lib/db/schema"
-import { trackServerEvent } from "@/lib/posthog/events"
+import { AVAILABLE_THEMES } from "@/lib/db/queries/micro-sites"
 import { publicFormRateLimit } from "@/lib/ratelimit"
+import { checkSlugAvailability } from "@/lib/services/micro-sites/check-slug-availability"
+import { publishMicroSite } from "@/lib/services/micro-sites/publish"
+import { saveMicroSite } from "@/lib/services/micro-sites/save"
+import { submitContactForm } from "@/lib/services/micro-sites/submit-contact-form"
 import type {
   MicroSiteConfig,
   MicroSiteSectionType,
   MicroSiteTheme,
 } from "@/types/domain"
-import { asc, eq } from "drizzle-orm"
-import { headers } from "next/headers"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared schemas
@@ -189,84 +181,38 @@ const saveSiteSchema = z.object({
 export const saveMicroSiteAction = authedAction
   .metadata({ actionName: "microSites.save" })
   .inputSchema(saveSiteSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Complete onboarding first.")
-
-    const site = await ensureMicroSite({
-      professionalId: professional.id,
-      fullName: professional.fullName,
-    })
-
-    if (parsedInput.slug && parsedInput.slug !== site.slug) {
-      const available = await isSlugAvailable(parsedInput.slug, site.id)
-      if (!available) {
-        throw new ActionError("That slug is already taken.")
-      }
-    }
-
-    const sectionsJson: MicroSiteConfig = {
-      order: parsedInput.order as MicroSiteSectionType[],
-      sections: parsedInput.sections,
-      branding: parsedInput.branding,
-    }
-
-    const updated = await updateMicroSite({
-      slug: parsedInput.slug ?? site.slug,
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await saveMicroSite(ctx, {
+      slug: parsedInput.slug,
       theme: parsedInput.theme,
-      sections: sectionsJson,
+      order: parsedInput.order as MicroSiteSectionType[],
+      sections: parsedInput.sections as MicroSiteConfig["sections"],
+      branding: parsedInput.branding as MicroSiteConfig["branding"],
       seoTitle: parsedInput.seoTitle ?? null,
       seoDescription: parsedInput.seoDescription ?? null,
-      socialLinks: parsedInput.socialLinks ?? null,
+      socialLinks: parsedInput.socialLinks ?? undefined,
     })
-    if (!updated) throw new ActionError("Couldn't save site.")
-
     revalidatePath("/dashboard/site-builder")
-    revalidatePath(`/${updated.slug}`)
-    return { id: updated.id, slug: updated.slug }
+    revalidatePath(`/${result.slug}`)
+    return result
   })
 
 export const publishMicroSiteAction = authedAction
   .metadata({ actionName: "microSites.publish" })
   .inputSchema(z.object({ publish: z.boolean() }))
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Complete onboarding first.")
-
-    const site = await ensureMicroSite({
-      professionalId: professional.id,
-      fullName: professional.fullName,
-    })
-
-    const updated = await updateMicroSite({ isPublished: parsedInput.publish })
-    if (!updated) throw new ActionError("Couldn't update publish state.")
-
-    // Only the publish transition matters for the funnel — unpublishing isn't
-    // tracked. Firing on every toggle would skew the funnel with edit churn.
-    if (parsedInput.publish) {
-      void trackServerEvent("micro_site_published", {
-        distinctId: professional.clerkUserId,
-        professionalId: professional.id,
-        plan: professional.plan,
-        siteId: updated.id,
-        slug: updated.slug,
-      })
-    }
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await publishMicroSite(ctx, parsedInput)
     revalidatePath("/dashboard/site-builder")
-    revalidatePath(`/${site.slug}`)
+    revalidatePath(`/${result.slug}`)
     revalidatePath("/sitemap.xml")
-    return { id: updated.id, isPublished: updated.isPublished }
+    return { id: result.id, isPublished: result.isPublished }
   })
 
 export const checkSlugAvailabilityAction = authedAction
   .metadata({ actionName: "microSites.checkSlug" })
   .inputSchema(z.object({ slug: slugSchema }))
-  .action(async ({ parsedInput }) => {
-    const site = await getOwnMicroSite()
-    if (!site) throw new ActionError("No site to check against yet.")
-    const available = await isSlugAvailable(parsedInput.slug, site.id)
-    return { available }
+  .action(async ({ parsedInput, ctx }) => {
+    return checkSlugAvailability(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,11 +241,6 @@ export const submitContactFormAction = publicAction
   .metadata({ actionName: "microSites.contact" })
   .inputSchema(contactFormSchema)
   .action(async ({ parsedInput }) => {
-    // Honeypot tripped — pretend success, skip the write.
-    if (parsedInput.website && parsedInput.website.trim().length > 0) {
-      return { ok: true }
-    }
-
     if (publicFormRateLimit) {
       const hdrs = await headers()
       const ip =
@@ -316,53 +257,7 @@ export const submitContactFormAction = publicAction
       }
     }
 
-    const resolved = await getProfessionalIdForPublishedSlug(parsedInput.slug)
-    if (!resolved) throw new ActionError("This site isn't live right now.")
-
-    // Find (or fall back to) the "new" stage. Default pipeline is seeded
-    // lazily when the professional first opens the pipeline, so a brand-new
-    // workspace may have zero stages — we bail loudly in that rare case.
-    const stageRows = await dbAdmin
-      .select({
-        id: leadStages.id,
-        isWon: leadStages.isWon,
-        isLost: leadStages.isLost,
-      })
-      .from(leadStages)
-      .where(eq(leadStages.professionalId, resolved.professionalId))
-      .orderBy(asc(leadStages.position))
-    const firstStage = stageRows.find((s) => !s.isWon && !s.isLost) ?? stageRows[0]
-    if (!firstStage) {
-      throw new ActionError(
-        "The professional hasn't set up their pipeline yet — try again later.",
-      )
-    }
-
-    const [created] = await dbAdmin
-      .insert(leads)
-      .values({
-        professionalId: resolved.professionalId,
-        stageId: firstStage.id,
-        fullName: parsedInput.fullName,
-        email: parsedInput.email,
-        phone: parsedInput.phone || null,
-        source: "micro-site",
-        notes: parsedInput.message,
-        metadata: {
-          slug: parsedInput.slug,
-          micro_site_id: resolved.siteId,
-        },
-      })
-      .returning()
-    if (!created) throw new ActionError("Couldn't save your message.")
-
-    await dbAdmin.insert(leadActivities).values({
-      leadId: created.id,
-      type: "created",
-      description: "Lead submitted from micro-site",
-      metadata: { source: "micro-site", slug: parsedInput.slug },
-    })
-
+    const result = await submitContactForm(parsedInput)
     revalidatePath("/dashboard/leads")
-    return { ok: true, id: created.id }
+    return result
   })

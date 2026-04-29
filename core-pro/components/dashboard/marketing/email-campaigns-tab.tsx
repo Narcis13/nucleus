@@ -52,7 +52,7 @@ export function EmailCampaignsTab({
   const sendAction = useAction(sendCampaignAction, {
     onSuccess: ({ data }) => {
       toast.success(
-        `Delivered to ${data?.delivered ?? 0} of ${data?.total ?? 0} recipients.`,
+        `Queued ${data?.enqueued ?? 0} of ${data?.total ?? 0} recipients — sending in the background.`,
       )
       router.refresh()
     },
@@ -105,7 +105,7 @@ export function EmailCampaignsTab({
               </Button>
             }
           />
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>New email campaign</DialogTitle>
               <DialogDescription>
@@ -201,7 +201,7 @@ export function EmailCampaignsTab({
           if (!open) setEditing(null)
         }}
       >
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit campaign</DialogTitle>
             <DialogDescription>

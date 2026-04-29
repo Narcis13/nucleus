@@ -1,5 +1,6 @@
 import "server-only"
 
+import { logError } from "@/lib/audit/log"
 import { env } from "@/lib/env"
 import { createNotification } from "@/lib/db/queries/notifications"
 import {
@@ -9,8 +10,8 @@ import {
 import { listPushSubscriptionsForUser } from "@/lib/db/queries/push-subscriptions"
 import { resolveChannels } from "@/lib/notifications/preferences"
 import { sendPush } from "@/lib/notifications/push"
+import { resolveBrandForRecipient } from "@/lib/resend/brand"
 import { getResend, fromAddress } from "@/lib/resend/client"
-import { captureException } from "@/lib/sentry"
 import type {
   NotificationChannel,
   NotificationType,
@@ -28,8 +29,8 @@ import NotificationEmail from "@/emails/notification"
 // Channel delivery respects user preferences AND quiet hours. The in-app row
 // is always written, even inside quiet hours, so unread counts stay correct.
 //
-// The function is resilient: a failure in any one channel is reported to
-// Sentry but does not prevent the others from firing. The return value
+// The function is resilient: a failure in any one channel is logged but
+// does not prevent the others from firing. The return value
 // surfaces what actually happened so callers can act on it (for example, to
 // show "push couldn't be delivered" in a settings test-notification flow).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,7 +105,12 @@ export async function sendNotification(
       })
       result.delivered.in_app = true
     } catch (err) {
-      captureException(err, { tags: { notification: "in_app" } })
+      logError(err, {
+        source: "notification:in_app",
+        professionalId: input.userType === "professional" ? input.userId : null,
+        clientId: input.userType === "client" ? input.userId : null,
+        metadata: { type: input.type },
+      })
     }
   }
 
@@ -114,22 +120,35 @@ export async function sendNotification(
     try {
       const resend = getResend()
       if (resend) {
+        // Pull the recipient's owning professional's brand so the email body
+        // matches what the preview route renders. Falls through to the
+        // template's "CorePro" fallback when no owner can be resolved.
+        const brand = await resolveBrandForRecipient(recipientKey)
         await resend.emails.send({
           from: fromAddress(),
           to: [contact.email],
           subject: input.title,
           react: NotificationEmail({
+            professionalName: brand?.professionalName,
+            branding: brand?.branding ?? null,
+            unsubscribeUrl: brand?.unsubscribeUrl,
+            locale: brand?.locale,
             recipientName: contact.fullName ?? null,
             title: input.title,
             body: input.body ?? null,
             link: absoluteUrl(input.link),
-            appUrl: env.NEXT_PUBLIC_APP_URL,
+            appUrl: brand?.appUrl ?? env.NEXT_PUBLIC_APP_URL,
           }),
         })
         result.delivered.email = true
       }
     } catch (err) {
-      captureException(err, { tags: { notification: "email" } })
+      logError(err, {
+        source: "notification:email",
+        professionalId: input.userType === "professional" ? input.userId : null,
+        clientId: input.userType === "client" ? input.userId : null,
+        metadata: { type: input.type },
+      })
     }
   }
 
@@ -149,7 +168,12 @@ export async function sendNotification(
         if (res.delivered) result.delivered.push.delivered += 1
       }
     } catch (err) {
-      captureException(err, { tags: { notification: "push" } })
+      logError(err, {
+        source: "notification:push",
+        professionalId: input.userType === "professional" ? input.userId : null,
+        clientId: input.userType === "client" ? input.userId : null,
+        metadata: { type: input.type },
+      })
     }
   }
 

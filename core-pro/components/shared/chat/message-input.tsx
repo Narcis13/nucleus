@@ -14,7 +14,10 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { dispatchMessageAppend } from "@/hooks/use-realtime"
-import { sendMessageAction } from "@/lib/actions/messages"
+import {
+  portalSendMessageAction,
+  sendMessageAction,
+} from "@/lib/actions/messages"
 import { useSupabaseBrowser } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -34,23 +37,32 @@ type Owner = {
   role: "professional" | "client"
 }
 
+// The dashboard and portal both send messages, but auth differs (Clerk vs
+// portal cookie). Either variant has the same input/output shape so the
+// component accepts whichever the parent provides.
+type SendAction =
+  | typeof sendMessageAction
+  | typeof portalSendMessageAction
+
 export function MessageInput({
   conversationId,
   owner,
   disabled,
   onBeforeSend,
+  sendAction = sendMessageAction,
 }: {
   conversationId: string
   owner: Owner
   disabled?: boolean
   onBeforeSend?: () => void
+  sendAction?: SendAction
 }) {
   const [text, setText] = useState("")
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const supabase = useSupabaseBrowser()
 
-  const { execute, isExecuting } = useAction(sendMessageAction, {
+  const { execute, isExecuting } = useAction(sendAction, {
     onSuccess: ({ data }) => {
       if (!data) return
       // Append immediately on the sender side so the bubble appears without

@@ -3,29 +3,15 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import {
-  ActionError,
-  authedAction,
-} from "@/lib/actions/safe-action"
-import {
-  createInvoice as createInvoiceQuery,
-  deleteInvoice as deleteInvoiceQuery,
-  getInvoice,
-  getInvoiceWithRefs,
-  markInvoiceSent as markInvoiceSentQuery,
-  markInvoiceViewed as markInvoiceViewedQuery,
-  recordPayment as recordPaymentQuery,
-  updateInvoice as updateInvoiceQuery,
-  upsertInvoiceSettings as upsertInvoiceSettingsQuery,
-} from "@/lib/db/queries/invoices"
-import { getProfessional } from "@/lib/db/queries/professionals"
-import {
-  sendInvoiceEmail,
-  sendReceiptEmail,
-} from "@/lib/invoices/emails"
-import { renderInvoicePdf } from "@/lib/invoices/pdf"
-import { trackServerEvent } from "@/lib/posthog/events"
-import type { InvoiceLineItem } from "@/types/domain"
+import { authedAction } from "@/lib/actions/safe-action"
+import { createInvoice } from "@/lib/services/invoices/create"
+import { deleteInvoice } from "@/lib/services/invoices/delete"
+import { generateInvoicePdf } from "@/lib/services/invoices/generate-pdf"
+import { markInvoiceViewed } from "@/lib/services/invoices/mark-viewed"
+import { recordPayment } from "@/lib/services/invoices/record-payment"
+import { saveInvoiceSettings } from "@/lib/services/invoices/save-settings"
+import { sendInvoice } from "@/lib/services/invoices/send"
+import { updateInvoice } from "@/lib/services/invoices/update"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared zod shapes
@@ -106,211 +92,63 @@ const settingsSchema = z.object({
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Totals helper — single source of truth for arithmetic so every action agrees
-// with the UI preview. We deliberately don't trust the client-supplied totals;
-// recompute from line_items + tax_rate + discount.
-// ─────────────────────────────────────────────────────────────────────────────
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
-function computeTotals(
-  lineItems: InvoiceLineItem[],
-  taxRate: number,
-  discount: number,
-) {
-  const subtotal = round2(
-    lineItems.reduce((sum, li) => sum + Number(li.amount || 0), 0),
-  )
-  const taxable = Math.max(0, subtotal - discount)
-  const taxAmount = round2((taxable * taxRate) / 100)
-  const total = round2(taxable + taxAmount)
-  return { subtotal, taxAmount, total }
-}
-
-function asNumericString(n: number): string {
-  return n.toFixed(2)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Actions
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createInvoiceAction = authedAction
   .metadata({ actionName: "invoices.create" })
   .inputSchema(createInvoiceSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    if (parsedInput.dueDate < parsedInput.issueDate) {
-      throw new ActionError("Due date cannot be before the issue date.")
-    }
-
-    const lineItems = parsedInput.lineItems.map((li) => ({
-      ...li,
-      amount: round2(Number(li.quantity) * Number(li.unit_price)),
-    }))
-    const totals = computeTotals(
-      lineItems,
-      parsedInput.taxRate,
-      parsedInput.discount,
-    )
-
-    const invoice = await createInvoiceQuery({
-      clientId: parsedInput.clientId,
-      appointmentId: parsedInput.appointmentId ?? null,
-      lineItems,
-      subtotal: asNumericString(totals.subtotal),
-      taxRate: asNumericString(parsedInput.taxRate),
-      taxAmount: asNumericString(totals.taxAmount),
-      discount: asNumericString(parsedInput.discount),
-      total: asNumericString(totals.total),
-      currency: parsedInput.currency,
-      issueDate: parsedInput.issueDate,
-      dueDate: parsedInput.dueDate,
-      terms: parsedInput.terms ?? "Net 30",
-      notes: parsedInput.notes ?? null,
-      status: parsedInput.status,
-    })
-
-    // If the professional chose "Create + send" we fire the email
-    // opportunistically. The send stamps `sent_at` and tolerates missing
-    // Resend configuration — worst case we end up with an invoice stuck in
-    // draft, which is obvious in the UI.
-    if (parsedInput.status === "sent") {
-      void sendInvoiceEmail({ invoiceId: invoice.id }).catch(() => {})
-    }
-
-    void trackServerEvent("invoice_created", {
-      distinctId: professional.clerkUserId,
-      professionalId: professional.id,
-      plan: professional.plan,
-      invoiceId: invoice.id,
-      total: totals.total,
-      currency: parsedInput.currency,
-      status: parsedInput.status,
-    })
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await createInvoice(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
-    return { id: invoice.id, invoiceNumber: invoice.invoiceNumber }
+    return result
   })
 
 export const updateInvoiceAction = authedAction
   .metadata({ actionName: "invoices.update" })
   .inputSchema(updateInvoiceSchema)
-  .action(async ({ parsedInput }) => {
-    const existing = await getInvoice(parsedInput.id)
-    if (!existing) throw new ActionError("Invoice not found.")
-    if (existing.status === "paid") {
-      throw new ActionError("Paid invoices can't be edited.")
-    }
-
-    // When any billing-affecting field changes, recompute. Fall back to the
-    // stored value for anything the caller didn't send.
-    const lineItems = (parsedInput.lineItems ??
-      (existing.lineItems as InvoiceLineItem[])) as InvoiceLineItem[]
-    const normalized = lineItems.map((li) => ({
-      ...li,
-      amount: round2(Number(li.quantity) * Number(li.unit_price)),
-    }))
-    const taxRate = parsedInput.taxRate ?? Number(existing.taxRate)
-    const discount = parsedInput.discount ?? Number(existing.discount)
-    const totals = computeTotals(normalized, taxRate, discount)
-
-    const patch = {
-      clientId: parsedInput.clientId ?? existing.clientId,
-      appointmentId: parsedInput.appointmentId ?? existing.appointmentId,
-      lineItems: normalized,
-      subtotal: asNumericString(totals.subtotal),
-      taxRate: asNumericString(taxRate),
-      taxAmount: asNumericString(totals.taxAmount),
-      discount: asNumericString(discount),
-      total: asNumericString(totals.total),
-      currency: parsedInput.currency ?? existing.currency,
-      issueDate: parsedInput.issueDate ?? existing.issueDate,
-      dueDate: parsedInput.dueDate ?? existing.dueDate,
-      terms: parsedInput.terms ?? existing.terms,
-      notes: parsedInput.notes ?? existing.notes,
-      status: parsedInput.status ?? existing.status,
-    }
-
-    const updated = await updateInvoiceQuery(parsedInput.id, patch)
-    if (!updated) throw new ActionError("Invoice not found.")
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateInvoice(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
     revalidatePath(`/dashboard/invoices/${parsedInput.id}`)
-    return { id: updated.id }
+    return result
   })
 
 export const sendInvoiceAction = authedAction
   .metadata({ actionName: "invoices.send" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const updated = await markInvoiceSentQuery(parsedInput.id)
-    if (!updated) throw new ActionError("Invoice not found.")
-    // Email is best-effort — same rationale as createInvoiceAction.
-    void sendInvoiceEmail({ invoiceId: updated.id }).catch(() => {})
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await sendInvoice(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
-    return { id: updated.id }
+    return result
   })
 
 export const markInvoiceViewedAction = authedAction
   .metadata({ actionName: "invoices.markViewed" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const updated = await markInvoiceViewedQuery(parsedInput.id)
-    if (!updated) throw new ActionError("Invoice not found.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await markInvoiceViewed(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
-    return { id: updated.id }
+    return result
   })
 
 export const recordPaymentAction = authedAction
   .metadata({ actionName: "invoices.recordPayment" })
   .inputSchema(recordPaymentSchema)
-  .action(async ({ parsedInput }) => {
-    const before = await getInvoice(parsedInput.id)
-    if (!before) throw new ActionError("Invoice not found.")
-
-    const updated = await recordPaymentQuery({
-      invoiceId: parsedInput.id,
-      amount: parsedInput.amount,
-      method: parsedInput.method,
-      reference: parsedInput.reference ?? null,
-      paidDate: parsedInput.paidDate ?? null,
-    })
-    if (!updated) throw new ActionError("Couldn't record payment.")
-
-    // Fire the receipt email only on the transition into `paid` — partials
-    // get a confirmation toast in-app but no email (prevents spam).
-    if (updated.status === "paid" && before.status !== "paid") {
-      void sendReceiptEmail({ invoiceId: updated.id }).catch(() => {})
-    }
-
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await recordPayment(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
-    revalidatePath(`/dashboard/invoices/${updated.id}`)
-    return {
-      id: updated.id,
-      status: updated.status,
-      paidAmount: updated.paidAmount,
-    }
+    revalidatePath(`/dashboard/invoices/${result.id}`)
+    return result
   })
 
 export const deleteInvoiceAction = authedAction
   .metadata({ actionName: "invoices.delete" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const existing = await getInvoice(parsedInput.id)
-    if (!existing) throw new ActionError("Invoice not found.")
-    if (existing.status !== "draft" && Number(existing.paidAmount) > 0) {
-      throw new ActionError(
-        "Can't delete an invoice with recorded payments. Void it instead.",
-      )
-    }
-    const deleted = await deleteInvoiceQuery(parsedInput.id)
-    if (!deleted) throw new ActionError("Couldn't delete invoice.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await deleteInvoice(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
-    return { ok: true }
+    return result
   })
 
 // Returns the rendered invoice PDF as a base64 string. The UI should prefer
@@ -320,45 +158,16 @@ export const deleteInvoiceAction = authedAction
 export const generateInvoicePDFAction = authedAction
   .metadata({ actionName: "invoices.generatePdf" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const data = await getInvoiceWithRefs(parsedInput.id)
-    if (!data || !data.professional) {
-      throw new ActionError("Invoice not found.")
-    }
-    const buffer = await renderInvoicePdf({
-      invoice: data.invoice,
-      client: data.client,
-      professional: data.professional,
-      settings: data.settings,
-    })
-    return {
-      filename: `${data.invoice.invoiceNumber || data.invoice.id}.pdf`,
-      mimeType: "application/pdf",
-      base64: buffer.toString("base64"),
-    }
+  .action(async ({ parsedInput, ctx }) => {
+    return generateInvoicePdf(ctx, parsedInput)
   })
 
 export const saveInvoiceSettingsAction = authedAction
   .metadata({ actionName: "invoices.saveSettings" })
   .inputSchema(settingsSchema)
-  .action(async ({ parsedInput }) => {
-    const patch: Record<string, unknown> = {}
-    if (parsedInput.invoicePrefix !== undefined)
-      patch.invoicePrefix = parsedInput.invoicePrefix
-    if (parsedInput.defaultDueDays !== undefined)
-      patch.defaultDueDays = parsedInput.defaultDueDays
-    if (parsedInput.defaultTerms !== undefined)
-      patch.defaultTerms = parsedInput.defaultTerms
-    if (parsedInput.defaultNotes !== undefined)
-      patch.defaultNotes = parsedInput.defaultNotes
-    if (parsedInput.taxRate !== undefined)
-      patch.taxRate = asNumericString(parsedInput.taxRate)
-    if (parsedInput.logoUrl !== undefined) patch.logoUrl = parsedInput.logoUrl
-    if (parsedInput.companyInfo !== undefined)
-      patch.companyInfo = parsedInput.companyInfo
-
-    await upsertInvoiceSettingsQuery(patch)
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await saveInvoiceSettings(ctx, parsedInput)
     revalidatePath("/dashboard/invoices")
     revalidatePath("/dashboard/settings")
-    return { ok: true }
+    return result
   })

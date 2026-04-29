@@ -2,9 +2,8 @@
 
 Short guide to the conventions baked into the boilerplate. Read
 `AGENTS.md` (and `CLAUDE.md`, which extends it) before changing
-framework-facing code — **Next.js 16 is not the Next.js you know.** The App
-Router, typed routes, and the `proxy.ts` middleware file all differ from
-older training data.
+framework-facing code. The App Router, typed routes, and `middleware.ts`
+follow Next.js 15.5 LTS conventions.
 
 ## Prerequisites
 
@@ -36,7 +35,7 @@ older training data.
 - Use `authedAction` / `publicAction` from `lib/actions/safe-action.ts`
   for every mutation. Throw `ActionError` for user-safe messages; any
   other error becomes the default "Something went wrong" string and is
-  reported to Sentry.
+  logged via `console.error`.
 - All DB reads go through `withRLS` (`lib/db/rls.ts`). The `dbAdmin`
   client is reserved for webhooks + cross-user admin work — never touch
   it from a user-driven handler.
@@ -140,8 +139,8 @@ most cases, but being explicit avoids surprises.
 ## Observability
 
 - Wrap risky async work with a `try/catch` and forward to
-  `captureException` (`lib/sentry`) with useful tags.
-- Server actions automatically report via the base client's
+  `console.error(err, { tags: { … } })` so the call site is greppable.
+- Server actions automatically log via the base client's
   `handleServerError` — no need to duplicate.
 - Feature usage → PostHog (`trackServerEvent`). Keep event names in
   snake_case, properties camelCase.

@@ -68,6 +68,7 @@ export function PortalDocumentsSurface({
         <DocumentList
           documents={shared}
           mode="client"
+          currentClientId={clientId}
           emptyState={
             <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               Nothing shared yet. Documents your professional sends will appear
@@ -84,6 +85,7 @@ export function PortalDocumentsSurface({
         <DocumentList
           documents={mine}
           mode="client"
+          currentClientId={clientId}
           emptyState={
             <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               Anything you upload will show up here.

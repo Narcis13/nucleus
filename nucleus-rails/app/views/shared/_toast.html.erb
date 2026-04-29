@@ -1,5 +1,0 @@
-<%# Minimal ephemeral toast rendered into #toasts via Turbo Stream. %>
-<%= render Ui::ToastComponent.new(
-      message: message,
-      variant: (defined?(kind) ? kind.to_sym : :info)
-    ) %>

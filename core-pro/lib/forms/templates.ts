@@ -175,6 +175,84 @@ export const FORM_TEMPLATES: FormTemplate[] = [
       ],
     },
   },
+  {
+    key: "property-viewer-survey",
+    title: "Property Viewer Survey",
+    description:
+      "Quick feedback after a viewing — captures the viewer's identity, ratings, and comments. Designed for public-link sharing.",
+    schema: {
+      version: 1,
+      submitLabel: "Send feedback",
+      fields: [
+        {
+          id: "intro",
+          type: "section",
+          label: "About your visit",
+          description:
+            "Thanks for taking a few minutes to share your impressions.",
+        },
+        {
+          id: "viewer_name",
+          type: "short_text",
+          label: "Your name",
+          required: true,
+          placeholder: "Jane Doe",
+        },
+        {
+          id: "viewer_email",
+          type: "email",
+          label: "Email",
+          required: true,
+        },
+        {
+          id: "viewer_phone",
+          type: "phone",
+          label: "Phone",
+        },
+        {
+          id: "rating_section",
+          type: "section",
+          label: "Your impressions",
+        },
+        {
+          id: "agent_rating",
+          type: "slider",
+          label: "How would you rate the agent?",
+          required: true,
+          min: 1,
+          max: 10,
+          step: 1,
+        },
+        {
+          id: "info_quality",
+          type: "slider",
+          label:
+            "How clear and complete was the information you received?",
+          required: true,
+          min: 1,
+          max: 10,
+          step: 1,
+        },
+        {
+          id: "interest",
+          type: "single_select",
+          label: "Are you interested in this property?",
+          required: true,
+          options: [
+            { value: "very", label: "Very interested" },
+            { value: "maybe", label: "Maybe — need to think" },
+            { value: "no", label: "Not for me" },
+          ],
+        },
+        {
+          id: "comments",
+          type: "long_text",
+          label: "Anything else you'd like to share?",
+          placeholder: "Highlights, concerns, suggestions…",
+        },
+      ],
+    },
+  },
 ]
 
 export function getTemplate(key: string): FormTemplate | null {

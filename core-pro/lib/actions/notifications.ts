@@ -1,35 +1,24 @@
 "use server"
 
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
-import { eq } from "drizzle-orm"
 import { z } from "zod"
 
-import { ActionError, authedAction } from "@/lib/actions/safe-action"
-import { dbAdmin } from "@/lib/db/client"
-import { clients, professionals } from "@/lib/db/schema"
-import {
-  markAllAsRead,
-  markAsRead,
-} from "@/lib/db/queries/notifications"
-import {
-  getMyNotificationPreferences,
-  updateMyNotificationPreferences,
-  type RecipientKey,
-} from "@/lib/db/queries/notification-settings"
-import {
-  deletePushSubscriptionByEndpoint,
-  upsertPushSubscription,
-} from "@/lib/db/queries/push-subscriptions"
-import { sendNotification } from "@/lib/notifications/send"
+import { authedAction } from "@/lib/actions/safe-action"
+import { getNotificationPreferences } from "@/lib/services/notifications/get-preferences"
+import { markAllNotificationsRead } from "@/lib/services/notifications/mark-all-read"
+import { markNotificationRead } from "@/lib/services/notifications/mark-read"
+import { sendTestNotification } from "@/lib/services/notifications/send-test"
+import { subscribePush } from "@/lib/services/notifications/subscribe-push"
+import { unsubscribePush } from "@/lib/services/notifications/unsubscribe-push"
+import { updateNotificationPreferences } from "@/lib/services/notifications/update-preferences"
 import type { NotificationPreferences } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Server actions for the notification center + preferences + browser push.
 //
 // Every action resolves the *current* user to either a professional or a
-// client row, then scopes work accordingly. Callers never pass a userId — the
-// server always derives it from the Clerk session.
+// client row (in the service layer), then scopes work accordingly. Callers
+// never pass a userId — the server always derives it from the Clerk session.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const notificationPreferencesSchema = z.object({
@@ -67,48 +56,41 @@ const notificationPreferencesSchema = z.object({
 export const markNotificationReadAction = authedAction
   .metadata({ actionName: "notifications.markRead" })
   .inputSchema(z.object({ id: z.string().uuid() }))
-  .action(async ({ parsedInput }) => {
-    const rows = await markAsRead(parsedInput.id)
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await markNotificationRead(ctx, parsedInput)
     revalidatePath("/dashboard/notifications")
     revalidatePath("/portal")
-    return { count: rows.length }
+    return result
   })
 
 export const markAllNotificationsReadAction = authedAction
   .metadata({ actionName: "notifications.markAllRead" })
   .inputSchema(z.object({}))
-  .action(async () => {
-    const recipient = await resolveRecipient()
-    if (!recipient) throw new ActionError("Unauthorized")
-    const rows = await markAllAsRead(recipient)
+  .action(async ({ ctx }) => {
+    const result = await markAllNotificationsRead(ctx)
     revalidatePath("/dashboard/notifications")
     revalidatePath("/portal")
-    return { count: rows.length }
+    return result
   })
 
 export const updateNotificationPreferencesAction = authedAction
   .metadata({ actionName: "notifications.updatePreferences" })
   .inputSchema(notificationPreferencesSchema)
-  .action(async ({ parsedInput }) => {
-    const recipient = await resolveRecipient()
-    if (!recipient) throw new ActionError("Unauthorized")
-    const stored = await updateMyNotificationPreferences(
-      recipient,
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateNotificationPreferences(
+      ctx,
       parsedInput as NotificationPreferences,
     )
     revalidatePath("/dashboard/settings/notifications")
     revalidatePath("/portal")
-    return { preferences: stored }
+    return result
   })
 
 export const getNotificationPreferencesAction = authedAction
   .metadata({ actionName: "notifications.getPreferences" })
   .inputSchema(z.object({}))
-  .action(async () => {
-    const recipient = await resolveRecipient()
-    if (!recipient) throw new ActionError("Unauthorized")
-    const prefs = await getMyNotificationPreferences(recipient)
-    return { preferences: prefs }
+  .action(async ({ ctx }) => {
+    return await getNotificationPreferences(ctx)
   })
 
 // ── Push subscription lifecycle ────────────────────────────────────────────
@@ -123,25 +105,15 @@ const subscribeSchema = z.object({
 export const subscribePushAction = authedAction
   .metadata({ actionName: "notifications.subscribePush" })
   .inputSchema(subscribeSchema)
-  .action(async ({ parsedInput }) => {
-    const recipient = await resolveRecipient()
-    if (!recipient) throw new ActionError("Unauthorized")
-    const row = await upsertPushSubscription({
-      ...recipient,
-      endpoint: parsedInput.endpoint,
-      p256dh: parsedInput.p256dh,
-      auth: parsedInput.auth,
-      userAgent: parsedInput.userAgent ?? null,
-    })
-    return { id: row.id }
+  .action(async ({ parsedInput, ctx }) => {
+    return await subscribePush(ctx, parsedInput)
   })
 
 export const unsubscribePushAction = authedAction
   .metadata({ actionName: "notifications.unsubscribePush" })
   .inputSchema(z.object({ endpoint: z.string().url() }))
-  .action(async ({ parsedInput }) => {
-    await deletePushSubscriptionByEndpoint({ endpoint: parsedInput.endpoint })
-    return { ok: true }
+  .action(async ({ parsedInput, ctx }) => {
+    return await unsubscribePush(ctx, parsedInput)
   })
 
 // Fires a sample notification to the current user. Used by the settings page
@@ -149,45 +121,6 @@ export const unsubscribePushAction = authedAction
 export const sendTestNotificationAction = authedAction
   .metadata({ actionName: "notifications.sendTest" })
   .inputSchema(z.object({}))
-  .action(async () => {
-    const recipient = await resolveRecipient()
-    if (!recipient) throw new ActionError("Unauthorized")
-    const result = await sendNotification({
-      ...recipient,
-      type: "system",
-      title: "Test notification",
-      body: "If you can read this, your notifications are wired up correctly.",
-      link:
-        recipient.userType === "professional"
-          ? "/dashboard/notifications"
-          : "/portal",
-    })
-    return {
-      in_app: result.delivered.in_app,
-      email: result.delivered.email,
-      push: result.delivered.push,
-    }
+  .action(async ({ ctx }) => {
+    return await sendTestNotification(ctx)
   })
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-async function resolveRecipient(): Promise<RecipientKey | null> {
-  const { userId } = await auth()
-  if (!userId) return null
-
-  const pro = await dbAdmin
-    .select({ id: professionals.id })
-    .from(professionals)
-    .where(eq(professionals.clerkUserId, userId))
-    .limit(1)
-  if (pro[0]) return { userId: pro[0].id, userType: "professional" }
-
-  const cli = await dbAdmin
-    .select({ id: clients.id })
-    .from(clients)
-    .where(eq(clients.clerkUserId, userId))
-    .limit(1)
-  if (cli[0]) return { userId: cli[0].id, userType: "client" }
-
-  return null
-}

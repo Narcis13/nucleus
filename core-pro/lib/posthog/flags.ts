@@ -1,8 +1,14 @@
 import "server-only"
 
+import { logError } from "@/lib/audit/log"
 import { getPostHogServer } from "@/lib/posthog/server"
-import { captureException } from "@/lib/sentry"
-import { getPlan, planAtLeast, type PlanFeature, type PlanId } from "@/lib/stripe/plans"
+import {
+  FEATURE_GATING_ENABLED,
+  getPlan,
+  planAtLeast,
+  type PlanFeature,
+  type PlanId,
+} from "@/lib/stripe/plans"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Feature flag registry — the set of flag keys the app knows how to ask
@@ -93,7 +99,10 @@ export async function isFeatureEnabled(
     })
     return result === true
   } catch (err) {
-    captureException(err, { tags: { module: "posthog", flag } })
+    logError(err, {
+      source: "posthog:isFeatureEnabled",
+      metadata: { flag, userId: input.userId },
+    })
     return FALLBACK_DEFAULTS[flag] ?? false
   }
 }
@@ -119,7 +128,10 @@ export async function getFeatureFlagValue(
     })
     return value ?? false
   } catch (err) {
-    captureException(err, { tags: { module: "posthog", flag } })
+    logError(err, {
+      source: "posthog:getFeatureFlag",
+      metadata: { flag, userId: input.userId },
+    })
     return FALLBACK_DEFAULTS[flag] ?? false
   }
 }
@@ -131,6 +143,7 @@ export function passesPlanGate(
   flag: FeatureFlag,
   planId: PlanId | null | undefined,
 ): boolean {
+  if (!FEATURE_GATING_ENABLED) return true
   const minPlan = PLAN_REQUIREMENTS[flag]
   const requiredFeature = FEATURE_REQUIREMENTS[flag]
 

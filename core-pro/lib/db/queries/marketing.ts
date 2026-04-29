@@ -1,14 +1,15 @@
 import "server-only"
 
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm"
 
 import { dbAdmin } from "@/lib/db/client"
-import { withRLS } from "@/lib/db/rls"
+import { withRLS, type Tx } from "@/lib/db/rls"
 import {
   clientTags,
   clients,
   emailCampaignRecipients,
   emailCampaigns,
+  leadMagnetClaims,
   leadMagnetDownloads,
   leadMagnets,
   professionalClients,
@@ -47,10 +48,27 @@ export async function listEmailCampaigns(): Promise<EmailCampaignListItem[]> {
       })
       .from(emailCampaigns)
       .orderBy(desc(emailCampaigns.createdAt))
-    return rows.map((r) => ({
-      campaign: r.campaign,
-      recipientCount: r.recipientCount ?? 0,
-    }))
+    // For sent/sending campaigns the recipients table is the source of truth.
+    // For unsent campaigns it's empty, so resolve the audience descriptor to
+    // surface the *projected* reach instead of a misleading 0.
+    return Promise.all(
+      rows.map(async (r) => {
+        const stored = r.recipientCount ?? 0
+        const hasRecipients =
+          r.campaign.status === "sent" ||
+          r.campaign.status === "sending" ||
+          r.campaign.status === "failed"
+        const recipientCount = hasRecipients
+          ? stored
+          : (
+              await resolveAudienceTx(
+                tx,
+                r.campaign.audience as EmailCampaignAudience,
+              )
+            ).length
+        return { campaign: r.campaign, recipientCount }
+      }),
+    )
   })
 }
 
@@ -68,7 +86,7 @@ export async function getEmailCampaign(
 }
 
 export async function createEmailCampaign(
-  data: Omit<NewEmailCampaign, "id" | "professionalId">,
+  data: Omit<NewEmailCampaign, "id">,
 ): Promise<EmailCampaign> {
   return withRLS(async (tx) => {
     const rows = await tx
@@ -126,67 +144,72 @@ export type ResolvedRecipient = {
   clientId: string | null
 }
 
+async function resolveAudienceTx(
+  tx: Tx,
+  audience: EmailCampaignAudience,
+): Promise<ResolvedRecipient[]> {
+  if (audience.type === "all_clients") {
+    const rows = await tx
+      .select({
+        id: clients.id,
+        email: clients.email,
+        fullName: clients.fullName,
+        status: professionalClients.status,
+      })
+      .from(professionalClients)
+      .innerJoin(clients, eq(clients.id, professionalClients.clientId))
+    return rows
+      .filter((r) => r.status === "active")
+      .map((r) => ({
+        email: r.email,
+        fullName: r.fullName,
+        clientId: r.id,
+      }))
+  }
+  if (audience.type === "status") {
+    const rows = await tx
+      .select({
+        id: clients.id,
+        email: clients.email,
+        fullName: clients.fullName,
+      })
+      .from(professionalClients)
+      .innerJoin(clients, eq(clients.id, professionalClients.clientId))
+      .where(eq(professionalClients.status, audience.status))
+    return rows.map((r) => ({
+      email: r.email,
+      fullName: r.fullName,
+      clientId: r.id,
+    }))
+  }
+  if (audience.type === "tag") {
+    const rows = await tx
+      .select({
+        id: clients.id,
+        email: clients.email,
+        fullName: clients.fullName,
+      })
+      .from(clientTags)
+      .innerJoin(clients, eq(clients.id, clientTags.clientId))
+      .where(eq(clientTags.tagId, audience.tagId))
+    return rows.map((r) => ({
+      email: r.email,
+      fullName: r.fullName,
+      clientId: r.id,
+    }))
+  }
+  if (audience.type === "leads_all") {
+    // Leads don't have a 1:1 client_id, so return nulls; the merge tag
+    // substitution falls back to the lead's own name when it has one.
+    return []
+  }
+  return []
+}
+
 export async function resolveAudience(
   audience: EmailCampaignAudience,
 ): Promise<ResolvedRecipient[]> {
-  return withRLS(async (tx) => {
-    if (audience.type === "all_clients") {
-      const rows = await tx
-        .select({
-          id: clients.id,
-          email: clients.email,
-          fullName: clients.fullName,
-          status: professionalClients.status,
-        })
-        .from(professionalClients)
-        .innerJoin(clients, eq(clients.id, professionalClients.clientId))
-      return rows
-        .filter((r) => r.status === "active")
-        .map((r) => ({
-          email: r.email,
-          fullName: r.fullName,
-          clientId: r.id,
-        }))
-    }
-    if (audience.type === "status") {
-      const rows = await tx
-        .select({
-          id: clients.id,
-          email: clients.email,
-          fullName: clients.fullName,
-        })
-        .from(professionalClients)
-        .innerJoin(clients, eq(clients.id, professionalClients.clientId))
-        .where(eq(professionalClients.status, audience.status))
-      return rows.map((r) => ({
-        email: r.email,
-        fullName: r.fullName,
-        clientId: r.id,
-      }))
-    }
-    if (audience.type === "tag") {
-      const rows = await tx
-        .select({
-          id: clients.id,
-          email: clients.email,
-          fullName: clients.fullName,
-        })
-        .from(clientTags)
-        .innerJoin(clients, eq(clients.id, clientTags.clientId))
-        .where(eq(clientTags.tagId, audience.tagId))
-      return rows.map((r) => ({
-        email: r.email,
-        fullName: r.fullName,
-        clientId: r.id,
-      }))
-    }
-    if (audience.type === "leads_all") {
-      // Leads don't have a 1:1 client_id, so return nulls; the merge tag
-      // substitution falls back to the lead's own name when it has one.
-      return []
-    }
-    return []
-  })
+  return withRLS((tx) => resolveAudienceTx(tx, audience))
 }
 
 // Called from the send action after Resend returns. Uses `dbAdmin` because the
@@ -255,7 +278,7 @@ export async function listSocialTemplates(): Promise<SocialTemplate[]> {
 }
 
 export async function createSocialTemplate(
-  data: Omit<NewSocialTemplate, "id" | "professionalId">,
+  data: Omit<NewSocialTemplate, "id">,
 ): Promise<SocialTemplate> {
   return withRLS(async (tx) => {
     const rows = await tx
@@ -306,7 +329,7 @@ export async function listLeadMagnets(): Promise<LeadMagnet[]> {
 }
 
 export async function createLeadMagnet(
-  data: Omit<NewLeadMagnet, "id" | "professionalId">,
+  data: Omit<NewLeadMagnet, "id">,
 ): Promise<LeadMagnet> {
   return withRLS(async (tx) => {
     const rows = await tx
@@ -389,6 +412,84 @@ export async function recordLeadMagnetDownload(args: {
     .update(leadMagnets)
     .set({ downloadCount: sql`${leadMagnets.downloadCount} + 1` })
     .where(eq(leadMagnets.id, args.leadMagnetId))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEAD MAGNET CLAIMS — double-opt-in tickets. We never expose the raw token,
+// only `sha256(token)` lives at rest. Claim consumption is a conditional
+// UPDATE so two parallel clicks of the same link race deterministically: the
+// loser sees an unclaimed update and falls through to the expired path.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type LeadMagnetClaim = {
+  id: string
+  leadMagnetId: string
+  professionalId: string
+  email: string
+  fullName: string
+  phone: string | null
+  slug: string
+}
+
+export async function createLeadMagnetClaim(args: {
+  leadMagnetId: string
+  professionalId: string
+  email: string
+  fullName: string
+  phone: string | null
+  slug: string
+  tokenHash: Buffer
+  expiresAt: Date
+}): Promise<{ id: string }> {
+  const [row] = await dbAdmin
+    .insert(leadMagnetClaims)
+    .values({
+      leadMagnetId: args.leadMagnetId,
+      professionalId: args.professionalId,
+      email: args.email,
+      fullName: args.fullName,
+      phone: args.phone,
+      slug: args.slug,
+      tokenHash: args.tokenHash,
+      expiresAt: args.expiresAt,
+    })
+    .returning({ id: leadMagnetClaims.id })
+  return row
+}
+
+export async function consumeLeadMagnetClaim(
+  tokenHash: Buffer,
+): Promise<LeadMagnetClaim | null> {
+  const rows = await dbAdmin
+    .update(leadMagnetClaims)
+    .set({ claimedAt: new Date() })
+    .where(
+      and(
+        eq(leadMagnetClaims.tokenHash, tokenHash),
+        isNull(leadMagnetClaims.claimedAt),
+        gt(leadMagnetClaims.expiresAt, sql`now()`),
+      ),
+    )
+    .returning({
+      id: leadMagnetClaims.id,
+      leadMagnetId: leadMagnetClaims.leadMagnetId,
+      professionalId: leadMagnetClaims.professionalId,
+      email: leadMagnetClaims.email,
+      fullName: leadMagnetClaims.fullName,
+      phone: leadMagnetClaims.phone,
+      slug: leadMagnetClaims.slug,
+    })
+  return rows[0] ?? null
+}
+
+export async function attachLeadIdToClaim(
+  claimId: string,
+  leadId: string,
+): Promise<void> {
+  await dbAdmin
+    .update(leadMagnetClaims)
+    .set({ leadId })
+    .where(eq(leadMagnetClaims.id, claimId))
 }
 
 export async function listLeadMagnetDownloads(

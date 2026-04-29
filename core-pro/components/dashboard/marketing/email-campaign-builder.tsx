@@ -97,7 +97,7 @@ export function EmailCampaignBuilder({
   const sendNowAction = useAction(sendCampaignAction, {
     onSuccess: ({ data }) => {
       toast.success(
-        `Delivered to ${data?.delivered ?? 0} of ${data?.total ?? 0} recipients.`,
+        `Queued ${data?.enqueued ?? 0} of ${data?.total ?? 0} recipients — sending in the background.`,
       )
       onDone()
     },
@@ -323,7 +323,11 @@ function AudiencePicker({
           }
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value) =>
+                AUDIENCE_STATUSES.find((s) => s.value === value)?.label ?? ""
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {AUDIENCE_STATUSES.map((s) => (
@@ -341,7 +345,9 @@ function AudiencePicker({
           onValueChange={(v) => v && onChange({ type: "tag", tagId: v })}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value) => tags.find((t) => t.id === value)?.name ?? ""}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {tags.map((t) => (

@@ -3,19 +3,16 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { ActionError, authedAction } from "@/lib/actions/safe-action"
-import {
-  createService as createServiceQuery,
-  deleteService as deleteServiceQuery,
-  getService,
-  setServiceActive,
-  updateService as updateServiceQuery,
-} from "@/lib/db/queries/services"
+import { authedAction } from "@/lib/actions/safe-action"
+import { createService } from "@/lib/services/catalog/create"
+import { deleteService } from "@/lib/services/catalog/delete"
+import { setServiceActive } from "@/lib/services/catalog/toggle-active"
+import { updateService } from "@/lib/services/catalog/update"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemas
-// Price is numeric(10,2) in Postgres — we accept a number in the UI and
-// serialize as string on the way in.
+// Price is numeric(10,2) in Postgres — we accept a number in the UI and the
+// service serializes as string on the way in.
 // ─────────────────────────────────────────────────────────────────────────────
 const baseFields = {
   name: z.string().min(1, "Name is required").max(200),
@@ -53,11 +50,6 @@ const toggleSchema = z.object({
   isActive: z.boolean(),
 })
 
-function priceToNumericString(n: number | null | undefined): string | null {
-  if (n === null || n === undefined) return null
-  return n.toFixed(2)
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Actions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,58 +57,35 @@ function priceToNumericString(n: number | null | undefined): string | null {
 export const createServiceAction = authedAction
   .metadata({ actionName: "services.create" })
   .inputSchema(createSchema)
-  .action(async ({ parsedInput }) => {
-    const created = await createServiceQuery({
-      name: parsedInput.name,
-      description: parsedInput.description ?? null,
-      price: priceToNumericString(parsedInput.price),
-      currency: parsedInput.currency,
-      durationMinutes: parsedInput.durationMinutes ?? null,
-      isActive: parsedInput.isActive,
-    })
-    if (!created) throw new ActionError("Couldn't create service.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await createService(ctx, parsedInput)
     revalidatePath("/dashboard/services")
-    return { id: created.id }
+    return result
   })
 
 export const updateServiceAction = authedAction
   .metadata({ actionName: "services.update" })
   .inputSchema(updateSchema)
-  .action(async ({ parsedInput }) => {
-    const existing = await getService(parsedInput.id)
-    if (!existing) throw new ActionError("Service not found.")
-
-    const updated = await updateServiceQuery(parsedInput.id, {
-      name: parsedInput.name,
-      description: parsedInput.description ?? null,
-      price: priceToNumericString(parsedInput.price),
-      currency: parsedInput.currency ?? existing.currency,
-      durationMinutes: parsedInput.durationMinutes ?? null,
-      ...(parsedInput.isActive === undefined
-        ? {}
-        : { isActive: parsedInput.isActive }),
-    })
-    if (!updated) throw new ActionError("Couldn't update service.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await updateService(ctx, parsedInput)
     revalidatePath("/dashboard/services")
-    return { id: updated.id }
+    return result
   })
 
 export const deleteServiceAction = authedAction
   .metadata({ actionName: "services.delete" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const ok = await deleteServiceQuery(parsedInput.id)
-    if (!ok) throw new ActionError("Service not found.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await deleteService(ctx, parsedInput)
     revalidatePath("/dashboard/services")
-    return { id: parsedInput.id }
+    return result
   })
 
 export const toggleServiceAction = authedAction
   .metadata({ actionName: "services.toggleActive" })
   .inputSchema(toggleSchema)
-  .action(async ({ parsedInput }) => {
-    const updated = await setServiceActive(parsedInput.id, parsedInput.isActive)
-    if (!updated) throw new ActionError("Service not found.")
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await setServiceActive(ctx, parsedInput)
     revalidatePath("/dashboard/services")
-    return { id: updated.id, isActive: updated.isActive }
+    return result
   })

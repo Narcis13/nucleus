@@ -6,7 +6,6 @@ import {
   sweepOverdueInvoices,
 } from "@/lib/db/queries/invoices"
 import { sendReminderEmail } from "@/lib/invoices/emails"
-import { captureException } from "@/lib/sentry"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Daily dunning sweep.
@@ -77,7 +76,7 @@ export async function runOverdueChecker(): Promise<SweepReport> {
         remindersSkipped += 1
       }
     } catch (err) {
-      captureException(err, {
+      console.error(err, {
         tags: { invoice_overdue_checker: "reminder" },
         extra: { invoiceId: item.invoice.id },
       })

@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-# Rebuild Tailwind once. Pair with bin/dev-nowatch.
-exec bin/rails tailwindcss:build "$@"

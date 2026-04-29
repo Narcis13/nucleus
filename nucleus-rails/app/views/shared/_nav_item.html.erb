@@ -1,6 +1,0 @@
-<%# Locals: path, label, active (bool), icon (optional) %>
-<% active_classes = local_assigns[:active] ? "bg-surface-2 text-fg" : "text-fg-muted hover:bg-surface-2 hover:text-fg" %>
-<%= link_to path, class: "flex items-center gap-2 rounded-md px-3 py-2 #{active_classes}" do %>
-  <% if local_assigns[:icon].present? %><span aria-hidden="true"><%= local_assigns[:icon] %></span><% end %>
-  <span><%= label %></span>
-<% end %>

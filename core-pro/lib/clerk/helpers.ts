@@ -1,6 +1,6 @@
 import "server-only"
 
-import { auth, clerkClient } from "@clerk/nextjs/server"
+import { auth } from "@clerk/nextjs/server"
 import { eq } from "drizzle-orm"
 
 import { dbAdmin } from "@/lib/db/client"
@@ -145,39 +145,6 @@ export async function linkProfessionalToOrg(
     .update(professionals)
     .set({ clerkOrgId, updatedAt: new Date() })
     .where(eq(professionals.clerkUserId, clerkUserId))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// inviteClient
-//
-// Creates a Clerk organization invitation so a client can join the
-// professional's workspace with the "client" role. The professional must have
-// `clerk_org_id` set — returned null otherwise so callers can surface a
-// "finish onboarding" message.
-//
-// The corresponding `clients` row and `professional_clients` link are created
-// by the `organizationMembership.created` webhook when the client accepts.
-// ─────────────────────────────────────────────────────────────────────────────
-export async function inviteClient(args: {
-  email: string
-  professionalId: string
-  clerkOrgId: string
-  inviterUserId?: string
-  redirectUrl?: string
-}): Promise<{ invitationId: string } | null> {
-  const client = await clerkClient()
-  const invitation = await client.organizations.createOrganizationInvitation({
-    organizationId: args.clerkOrgId,
-    emailAddress: args.email,
-    role: "org:member",
-    inviterUserId: args.inviterUserId,
-    redirectUrl: args.redirectUrl,
-    publicMetadata: {
-      professional_id: args.professionalId,
-      role: "client",
-    },
-  })
-  return { invitationId: invitation.id }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

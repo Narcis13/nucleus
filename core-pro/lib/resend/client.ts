@@ -4,10 +4,11 @@ import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
 import { Resend } from "resend"
 
+import { logError } from "@/lib/audit/log"
 import { env } from "@/lib/env"
-import { captureException } from "@/lib/sentry"
 import type { PlanId } from "@/lib/stripe/plans"
 
+import { resolveProfessionalBrand } from "./brand"
 import {
   TEMPLATES,
   type EmailTemplateId,
@@ -194,8 +195,14 @@ export async function sendEmail<K extends EmailTemplateId>(
   }
 
   const entry = TEMPLATES[args.template]
-  const subject = args.subject ?? entry.subject(args.data)
-  const element = entry.render(args.data)
+
+  // Auto-fill brand context (professionalName/branding/appUrl/unsubscribeUrl/
+  // locale) from the tenant when callers haven't already supplied it. Caller-
+  // provided values always win — this is a safety net so live sends match what
+  // the preview route renders for the same professional.
+  const data = await mergeBrandIntoData(args.tenantId ?? null, args.data)
+  const subject = args.subject ?? entry.subject(data)
+  const element = entry.render(data)
 
   try {
     const response = await resend.emails.send({
@@ -208,14 +215,38 @@ export async function sendEmail<K extends EmailTemplateId>(
       headers: args.headers,
     })
     if (response.error) {
-      captureException(response.error, {
-        tags: { email_template: args.template },
+      logError(response.error, {
+        source: "resend:send",
+        professionalId: args.tenantId ?? null,
+        metadata: { template: args.template },
       })
       return { sent: false, reason: "error", error: response.error }
     }
     return { sent: true, id: response.data?.id ?? null }
   } catch (error) {
-    captureException(error, { tags: { email_template: args.template } })
+    logError(error, {
+      source: "resend:send",
+      professionalId: args.tenantId ?? null,
+      metadata: { template: args.template },
+    })
     return { sent: false, reason: "error", error }
   }
+}
+
+// Merge resolved brand fields into the caller's template data. Skips the
+// lookup entirely when the caller already supplied a `professionalName` —
+// every existing call site that fetches branding manually does, so we don't
+// burn a SELECT per send for the happy path.
+async function mergeBrandIntoData<K extends EmailTemplateId>(
+  tenantId: string | null,
+  data: EmailTemplateMap[K],
+): Promise<EmailTemplateMap[K]> {
+  if (!tenantId) return data
+  const existing = data as Record<string, unknown>
+  if (typeof existing.professionalName === "string" && existing.professionalName.length > 0) {
+    return data
+  }
+  const brand = await resolveProfessionalBrand(tenantId)
+  if (!brand) return data
+  return { ...brand, ...existing } as EmailTemplateMap[K]
 }

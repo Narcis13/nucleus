@@ -155,7 +155,7 @@ export function InvoiceList({
               </Button>
             }
           />
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>New invoice</DialogTitle>
               <DialogDescription>
@@ -316,7 +316,7 @@ export function InvoiceList({
           open
           onOpenChange={(next) => !next && setEditingInvoice(null)}
         >
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
               <DialogTitle>
                 Edit invoice {editingInvoice.invoiceNumber}

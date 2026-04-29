@@ -1,20 +1,15 @@
 "use server"
 
-import { auth } from "@clerk/nextjs/server"
 import { z } from "zod"
 
-import { ActionError, authedAction } from "@/lib/actions/safe-action"
-import {
-  getMessages as getMessagesQuery,
-  getOrCreateConversation as getOrCreateConversationQuery,
-  markMessagesRead,
-  sendMessage as sendMessageQuery,
-} from "@/lib/db/queries/messages"
-import { getProfessional } from "@/lib/db/queries/professionals"
-import { trackServerEvent } from "@/lib/posthog/events"
-import { dbAdmin } from "@/lib/db/client"
-import { clients, conversations } from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
+import { ActionError, authedAction, portalAction } from "@/lib/actions/safe-action"
+import { getOrCreateConversation } from "@/lib/services/messages/get-or-create-conversation"
+import { markMessagesAsRead } from "@/lib/services/messages/mark-as-read"
+import { openClientConversation } from "@/lib/services/messages/open-client-conversation"
+import { portalMarkMessagesAsRead } from "@/lib/services/messages/portal-mark-read"
+import { portalSendMessage } from "@/lib/services/messages/portal-send"
+import { sendMessage } from "@/lib/services/messages/send"
+import { simulateClientReply } from "@/lib/services/messages/simulate-client-reply"
 import { env } from "@/lib/env"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,43 +41,11 @@ const idSchema = z.object({ conversationId: z.string().uuid() })
 export const sendMessageAction = authedAction
   .metadata({ actionName: "messages.send" })
   .inputSchema(sendSchema)
-  .action(async ({ parsedInput }) => {
-    const sender = await resolveSender()
-    if (!sender) throw new ActionError("Unauthorized")
-
-    const created = await sendMessageQuery({
-      conversationId: parsedInput.conversationId,
-      senderId: sender.id,
-      senderRole: sender.role,
-      content: parsedInput.content?.trim() || undefined,
-      type: parsedInput.type,
-      mediaUrl: parsedInput.mediaUrl,
-    })
-
-    const { userId } = await auth()
-    if (userId) {
-      void trackServerEvent("message_sent", {
-        distinctId: userId,
-        conversationId: parsedInput.conversationId,
-        senderRole: sender.role,
-        messageType: parsedInput.type,
-      })
-    }
-
+  .action(async ({ parsedInput, ctx }) => {
     // No revalidatePath here: Realtime + optimistic client state carry the
     // UI. revalidatePath on a rapid-fire path stacks RSC renders and races
     // with router.refresh() elsewhere (see feedback memory on Next 16).
-    return {
-      id: created.id,
-      conversationId: created.conversationId,
-      senderId: created.senderId,
-      senderRole: created.senderRole,
-      content: created.content,
-      type: created.type,
-      mediaUrl: created.mediaUrl,
-      readAt: created.readAt ? created.readAt.toISOString() : null,
-      createdAt: created.createdAt.toISOString(),
-    }
+    return sendMessage(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,11 +56,8 @@ export const sendMessageAction = authedAction
 export const getOrCreateConversationAction = authedAction
   .metadata({ actionName: "messages.getOrCreate" })
   .inputSchema(getOrCreateSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-    const conversation = await getOrCreateConversationQuery(parsedInput.clientId)
-    return { id: conversation.id }
+  .action(async ({ parsedInput, ctx }) => {
+    return getOrCreateConversation(ctx, parsedInput)
   })
 
 // Single round-trip for the inline client-profile chat tab: opens (or
@@ -106,25 +66,8 @@ export const getOrCreateConversationAction = authedAction
 export const openClientConversationAction = authedAction
   .metadata({ actionName: "messages.openClientConversation" })
   .inputSchema(getOrCreateSchema)
-  .action(async ({ parsedInput }) => {
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-    const conversation = await getOrCreateConversationQuery(parsedInput.clientId)
-    const messages = await getMessagesQuery(conversation.id)
-    return {
-      conversationId: conversation.id,
-      messages: messages.map((m) => ({
-        id: m.id,
-        conversationId: m.conversationId,
-        senderId: m.senderId,
-        senderRole: m.senderRole,
-        content: m.content,
-        type: m.type,
-        mediaUrl: m.mediaUrl,
-        readAt: m.readAt ? m.readAt.toISOString() : null,
-        createdAt: m.createdAt.toISOString(),
-      })),
-    }
+  .action(async ({ parsedInput, ctx }) => {
+    return openClientConversation(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,13 +77,10 @@ export const openClientConversationAction = authedAction
 export const markMessagesAsReadAction = authedAction
   .metadata({ actionName: "messages.markRead" })
   .inputSchema(idSchema)
-  .action(async ({ parsedInput }) => {
-    const sender = await resolveSender()
-    if (!sender) throw new ActionError("Unauthorized")
-    const result = await markMessagesRead(parsedInput.conversationId, sender.role)
+  .action(async ({ parsedInput, ctx }) => {
     // No revalidate: the UPDATE broadcasts via Realtime and optimistic
     // client state clears unread badges without an RSC round-trip.
-    return { count: result.length }
+    return markMessagesAsRead(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,61 +103,25 @@ export const simulateClientReplyAction = authedAction
     if (env.NODE_ENV === "production") {
       throw new ActionError("Not available in production.")
     }
-
-    const professional = await getProfessional()
-    if (!professional) throw new ActionError("Unauthorized")
-
-    // Resolve the conversation's clientId via the RLS-scoped tx — this
-    // doubles as authorization (the pro can only see their own threads).
-    const [convo] = await ctx.db
-      .select({ clientId: conversations.clientId })
-      .from(conversations)
-      .where(eq(conversations.id, parsedInput.conversationId))
-      .limit(1)
-    if (!convo) throw new ActionError("Conversation not found")
-
-    const created = await sendMessageQuery({
-      conversationId: parsedInput.conversationId,
-      senderId: convo.clientId,
-      senderRole: "client",
-      content: parsedInput.content.trim(),
-    })
-
-    return {
-      id: created.id,
-      conversationId: created.conversationId,
-      senderId: created.senderId,
-      senderRole: created.senderRole,
-      content: created.content,
-      type: created.type,
-      mediaUrl: created.mediaUrl,
-      readAt: created.readAt ? created.readAt.toISOString() : null,
-      createdAt: created.createdAt.toISOString(),
-    }
+    return simulateClientReply(ctx, parsedInput)
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Portal-side variants — same input/output shape as the dashboard actions,
+// but auth comes from the `nucleus_portal` cookie session and the sender is
+// fixed to the calling client. Shared chat components accept either via the
+// `sendAction` / `markReadAction` props.
 // ─────────────────────────────────────────────────────────────────────────────
+export const portalSendMessageAction = portalAction
+  .metadata({ actionName: "messages.portal.send" })
+  .inputSchema(sendSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    return portalSendMessage(ctx, parsedInput)
+  })
 
-// Resolves the current Clerk user to one of { professional, client } with
-// their internal uuid. Uses dbAdmin for the client-side lookup to avoid
-// opening a second RLS transaction inside the action (the outer authedAction
-// is already in one). For the professional side we reuse `getProfessional`.
-async function resolveSender(): Promise<
-  { id: string; role: "professional" | "client" } | null
-> {
-  const professional = await getProfessional()
-  if (professional) return { id: professional.id, role: "professional" }
-
-  const { userId } = await auth()
-  if (!userId) return null
-  const rows = await dbAdmin
-    .select({ id: clients.id })
-    .from(clients)
-    .where(eq(clients.clerkUserId, userId))
-    .limit(1)
-  const clientRow = rows[0]
-  if (!clientRow) return null
-  return { id: clientRow.id, role: "client" }
-}
+export const portalMarkMessagesAsReadAction = portalAction
+  .metadata({ actionName: "messages.portal.markRead" })
+  .inputSchema(idSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    return portalMarkMessagesAsRead(ctx, parsedInput)
+  })

@@ -17,6 +17,7 @@ import type {
   emailCampaignRecipients,
   emailCampaigns,
   formAssignments,
+  formPublicShares,
   formResponses,
   forms,
   invoiceSettings,
@@ -75,6 +76,7 @@ export type NewMessage = InferInsertModel<typeof messages>
 export type Form = InferSelectModel<typeof forms>
 export type FormAssignment = InferSelectModel<typeof formAssignments>
 export type FormResponse = InferSelectModel<typeof formResponses>
+export type FormPublicShare = InferSelectModel<typeof formPublicShares>
 
 // ── Documents, invoices, automations, marketing, settings ──────────────────
 export type Document = InferSelectModel<typeof documents>
