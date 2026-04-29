@@ -1,5 +1,6 @@
 import "server-only"
 
+import { logError } from "@/lib/audit/log"
 import { getPostHogServer } from "@/lib/posthog/server"
 import {
   FEATURE_GATING_ENABLED,
@@ -98,7 +99,10 @@ export async function isFeatureEnabled(
     })
     return result === true
   } catch (err) {
-    console.error(err, { tags: { module: "posthog", flag } })
+    logError(err, {
+      source: "posthog:isFeatureEnabled",
+      metadata: { flag, userId: input.userId },
+    })
     return FALLBACK_DEFAULTS[flag] ?? false
   }
 }
@@ -124,7 +128,10 @@ export async function getFeatureFlagValue(
     })
     return value ?? false
   } catch (err) {
-    console.error(err, { tags: { module: "posthog", flag } })
+    logError(err, {
+      source: "posthog:getFeatureFlag",
+      metadata: { flag, userId: input.userId },
+    })
     return FALLBACK_DEFAULTS[flag] ?? false
   }
 }

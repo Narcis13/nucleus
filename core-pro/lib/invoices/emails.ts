@@ -3,6 +3,7 @@ import "server-only"
 import { render } from "@react-email/components"
 import { eq } from "drizzle-orm"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import { env } from "@/lib/env"
 import {
@@ -179,7 +180,12 @@ async function dispatch(
     })
     return { sent: true }
   } catch (err) {
-    console.error(err, { tags: { invoice_email: kind } })
+    logError(err, {
+      source: "invoice:email",
+      professionalId: ctx.professional.id,
+      clientId: ctx.client?.id ?? null,
+      metadata: { kind, invoiceId: ctx.invoice.id },
+    })
     return { sent: false }
   }
 }

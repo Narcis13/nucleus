@@ -4,6 +4,7 @@ import {
   FolderOpen,
   Home,
   MessageCircle,
+  Receipt,
   Sparkles,
   TrendingUp,
   type LucideIcon,
@@ -52,6 +53,12 @@ export const PORTAL_NAV: PortalNavItem[] = [
     fallbackLabel: "Forms",
     href: "/portal/forms",
     icon: FileText,
+  },
+  {
+    labelKey: "invoices",
+    fallbackLabel: "Invoices",
+    href: "/portal/invoices",
+    icon: Receipt,
   },
   {
     labelKey: "progress",

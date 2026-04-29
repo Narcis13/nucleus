@@ -10,14 +10,21 @@ import {
   formAssignments,
   formResponses,
   forms,
+  invoiceSettings,
+  invoices,
   messages,
+  professionals,
 } from "@/lib/db/schema"
 import type {
+  Client,
   Document,
   Form,
   FormAssignment,
   FormResponse,
+  Invoice,
+  InvoiceSettings,
   Message,
+  Professional,
 } from "@/types/domain"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,4 +294,128 @@ export async function getPortalProfessionalStorageUsedBytes(
     .where(eq(documents.professionalId, professionalId))
   const raw = rows[0]?.total ?? "0"
   return typeof raw === "string" ? Number.parseInt(raw, 10) : Number(raw)
+}
+
+// Currency + locale for the portal. The branding-projection helper
+// `getPortalProfessionalById` deliberately excludes financial fields; this
+// extra hop keeps that surface narrow while still letting portal pages
+// format money in the professional's preferred locale/currency.
+export async function getPortalProfessionalLocale(
+  professionalId: string,
+): Promise<{ currency: string; locale: string } | null> {
+  const [row] = await dbAdmin
+    .select({
+      currency: professionals.currency,
+      locale: professionals.locale,
+    })
+    .from(professionals)
+    .where(eq(professionals.id, professionalId))
+    .limit(1)
+  return row ?? null
+}
+
+// Invoices the client should see in their portal. Drafts and voided invoices
+// are excluded — those represent in-progress / cancelled work the
+// professional hasn't shared. Sorted issue-date desc so the freshest invoice
+// is on top.
+export async function getPortalInvoices(clientId: string): Promise<Invoice[]> {
+  return dbAdmin
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.clientId, clientId),
+        inArray(invoices.status, [
+          "sent",
+          "viewed",
+          "partial",
+          "paid",
+          "overdue",
+        ] as const),
+      ),
+    )
+    .orderBy(desc(invoices.issueDate))
+}
+
+// Single invoice + the refs needed to render the PDF, scoped to the calling
+// client. Returns null when the invoice doesn't belong to them or is still a
+// draft / voided. Mirrors `getInvoiceWithRefs` but scoped to the portal user.
+export async function getPortalInvoiceWithRefs(
+  invoiceId: string,
+  clientId: string,
+): Promise<
+  | {
+      invoice: Invoice
+      client: Client | null
+      professional: Pick<
+        Professional,
+        "id" | "fullName" | "email" | "currency" | "locale"
+      > | null
+      settings: InvoiceSettings | null
+    }
+  | null
+> {
+  const rows = await dbAdmin
+    .select({
+      invoice: invoices,
+      client: clients,
+      professional: {
+        id: professionals.id,
+        fullName: professionals.fullName,
+        email: professionals.email,
+        currency: professionals.currency,
+        locale: professionals.locale,
+      },
+    })
+    .from(invoices)
+    .leftJoin(clients, eq(clients.id, invoices.clientId))
+    .leftJoin(professionals, eq(professionals.id, invoices.professionalId))
+    .where(
+      and(
+        eq(invoices.id, invoiceId),
+        eq(invoices.clientId, clientId),
+        inArray(invoices.status, [
+          "sent",
+          "viewed",
+          "partial",
+          "paid",
+          "overdue",
+        ] as const),
+      ),
+    )
+    .limit(1)
+  const row = rows[0]
+  if (!row) return null
+
+  const settingsRows = await dbAdmin
+    .select()
+    .from(invoiceSettings)
+    .where(eq(invoiceSettings.professionalId, row.invoice.professionalId))
+    .limit(1)
+
+  return {
+    invoice: row.invoice,
+    client: row.client?.id ? row.client : null,
+    professional: row.professional?.id ? row.professional : null,
+    settings: settingsRows[0] ?? null,
+  }
+}
+
+// Stamp `viewed_at` and flip `sent → viewed` the first time a portal client
+// opens an invoice. Idempotent — `coalesce` guards the timestamp and the
+// status case keeps later states (`partial`/`paid`/`overdue`) intact.
+export async function markPortalInvoiceViewed(
+  invoiceId: string,
+  clientId: string,
+): Promise<void> {
+  await dbAdmin
+    .update(invoices)
+    .set({
+      viewedAt: sql`coalesce(${invoices.viewedAt}, now())`,
+      status: sql`case
+        when ${invoices.status} = 'sent' then 'viewed'
+        else ${invoices.status}
+      end`,
+    })
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.clientId, clientId)))
 }

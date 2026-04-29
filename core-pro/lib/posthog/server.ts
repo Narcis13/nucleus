@@ -2,6 +2,7 @@ import "server-only"
 
 import { PostHog } from "posthog-node"
 
+import { logError } from "@/lib/audit/log"
 import { env } from "@/lib/env"
 
 // Lazy singleton so webhook / action handlers share a single PostHog client
@@ -26,7 +27,7 @@ export function getPostHogServer(): PostHog | null {
 export type ServerEventProperties = Record<string, unknown>
 
 // Fire-and-forget capture. Never throws — instrumentation must not break the
-// action/webhook it runs inside. Logs failures via console.error instead.
+// action/webhook it runs inside. Failures land in `error_logs`.
 export async function captureServerEvent(args: {
   distinctId: string
   event: string
@@ -47,7 +48,10 @@ export async function captureServerEvent(args: {
     await client.shutdown()
     _client = null
   } catch (err) {
-    console.error(err, { tags: { module: "posthog", event: args.event } })
+    logError(err, {
+      source: "posthog:capture",
+      metadata: { event: args.event, distinctId: args.distinctId },
+    })
   }
 }
 
@@ -68,6 +72,9 @@ export async function identifyServer(args: {
     await client.shutdown()
     _client = null
   } catch (err) {
-    console.error(err, { tags: { module: "posthog", step: "identify" } })
+    logError(err, {
+      source: "posthog:identify",
+      metadata: { distinctId: args.distinctId },
+    })
   }
 }

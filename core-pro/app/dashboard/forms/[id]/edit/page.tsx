@@ -44,6 +44,7 @@ export default async function FormEditorPage({
       />
       <PublicSharesList formId={detail.form.id} shares={shares} />
       <ResponsesList
+        formId={detail.form.id}
         schema={schema}
         assignments={detail.assignments}
         responses={detail.responses}

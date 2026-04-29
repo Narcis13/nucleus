@@ -2,6 +2,7 @@ import "server-only"
 
 import { and, eq, sql } from "drizzle-orm"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import {
   finalizeCampaignSend,
@@ -123,7 +124,11 @@ export async function processCampaignSend(
           .where(eq(emailCampaigns.id, campaign.id))
       }
     } catch (err) {
-      console.error(err, { tags: { action: "marketing.processCampaignSend" } })
+      logError(err, {
+        source: "service:marketing.processCampaignSend",
+        professionalId: professional.id,
+        metadata: { campaignId, recipientId: row.id },
+      })
       await markRecipientSent({
         id: row.id,
         error: err instanceof Error ? err.message : "Unknown error",

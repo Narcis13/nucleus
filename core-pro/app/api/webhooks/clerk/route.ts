@@ -3,6 +3,7 @@ import { and, eq, isNull } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
+import { logError } from "@/lib/audit/log"
 import {
   deleteProfessionalByClerkId,
   linkProfessionalToOrg,
@@ -39,7 +40,10 @@ export async function POST(req: NextRequest) {
   try {
     evt = await verifyWebhook(req)
   } catch (err) {
-    console.error(err, { tags: { webhook: "clerk", stage: "verify" } })
+    logError(err, {
+      source: "webhook:clerk",
+      metadata: { stage: "verify" },
+    })
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 400 },
@@ -102,8 +106,9 @@ export async function POST(req: NextRequest) {
         break
     }
   } catch (err) {
-    console.error(err, {
-      tags: { webhook: "clerk", eventType: evt.type },
+    logError(err, {
+      source: "webhook:clerk",
+      metadata: { eventType: evt.type },
     })
     // Return 500 so Clerk retries. Svix will back off exponentially.
     return NextResponse.json(

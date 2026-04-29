@@ -1,9 +1,13 @@
 "use client"
 
+import { Download } from "lucide-react"
+import { useAction } from "next-safe-action/hooks"
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { ResponseValueView } from "@/components/shared/forms/form-renderer"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -11,16 +15,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { exportFormResponsesAction } from "@/lib/actions/forms"
 import type { Client, FormAssignment, FormResponse } from "@/types/domain"
 import type { FormResponseData, FormSchema } from "@/types/forms"
 
 // Below-the-fold block on the form editor: shows assignments and submitted
 // responses. A response opens in a dialog with per-field read-only views.
 export function ResponsesList({
+  formId,
   schema,
   assignments,
   responses,
 }: {
+  formId: string
   schema: FormSchema
   assignments: Array<
     FormAssignment & {
@@ -32,6 +39,22 @@ export function ResponsesList({
   >
 }) {
   const [openResponse, setOpenResponse] = useState<FormResponse | null>(null)
+
+  const exportAction = useAction(exportFormResponsesAction, {
+    onSuccess: ({ data }) => {
+      if (!data) return
+      const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = data.filename
+      a.click()
+      URL.revokeObjectURL(url)
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError ?? "Couldn't export CSV.")
+    },
+  })
 
   if (assignments.length === 0 && responses.length === 0) {
     return (
@@ -45,12 +68,23 @@ export function ResponsesList({
     <div className="flex flex-col gap-6">
       {responses.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="font-heading text-base font-semibold text-foreground">
-            Responses
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {responses.length}
-            </span>
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-heading text-base font-semibold text-foreground">
+              Responses
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {responses.length}
+              </span>
+            </h2>
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => exportAction.execute({ formId })}
+              disabled={exportAction.isPending}
+            >
+              <Download className="size-3" />
+              Export CSV
+            </Button>
+          </div>
           <ul className="divide-y divide-border rounded-lg border border-border bg-card">
             {responses.map((r) => (
               <li key={r.id}>

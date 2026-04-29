@@ -2,6 +2,7 @@ import "server-only"
 
 import { asc, eq } from "drizzle-orm"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import {
   attachLeadIdToClaim,
@@ -108,7 +109,11 @@ export async function claimLeadMagnet(args: {
       })
     url = data?.signedUrl ?? null
   } catch (err) {
-    console.error(err, { tags: { action: "marketing.claimLeadMagnet" } })
+    logError(err, {
+      source: "service:marketing.claimLeadMagnet",
+      professionalId: claim.professionalId,
+      metadata: { leadMagnetId: magnet.id },
+    })
   }
   if (!url) {
     const admin = getSupabaseAdmin()

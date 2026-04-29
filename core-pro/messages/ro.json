@@ -136,6 +136,7 @@
       "messages": "Mesaje",
       "forms": "Formulare",
       "documents": "Documente",
+      "invoices": "Facturi",
       "progress": "Progres"
     },
     "header": {
@@ -156,6 +157,33 @@
     "forms": {
       "title": "Formulare",
       "empty": "Nu ai formulare de completat."
+    },
+    "invoices": {
+      "title": "Facturi",
+      "description": "Toate facturile pe care profesionistul tău le-a partajat cu tine.",
+      "emptyTitle": "Încă nu ai facturi",
+      "emptyDescription": "Facturile partajate de profesionistul tău vor apărea aici.",
+      "outstanding": "De plătit",
+      "outstandingCount": "{count, plural, =0 {nimic în așteptare} one {# factură deschisă} few {# facturi deschise} other {# de facturi deschise}}",
+      "overdue": "Restante",
+      "overdueCount": "{count, plural, =0 {nicio restanță} one {# restantă} few {# restante} other {# de restante}}",
+      "paid": "Plătite",
+      "paidCount": "{count, plural, =0 {nicio plată încă} one {# plată} few {# plăți} other {# de plăți}}",
+      "columnInvoice": "Factură",
+      "columnStatus": "Stare",
+      "columnIssued": "Emisă",
+      "columnDue": "Scadentă",
+      "columnTotal": "Total",
+      "columnPaid": "Plătit",
+      "download": "Descarcă",
+      "downloadAriaLabel": "Descarcă factura {invoice}",
+      "status": {
+        "sent": "Trimisă",
+        "viewed": "Vizualizată",
+        "partial": "Parțial",
+        "paid": "Plătită",
+        "overdue": "Restantă"
+      }
     },
     "progress": {
       "title": "Progres",

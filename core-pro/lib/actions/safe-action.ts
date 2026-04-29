@@ -8,6 +8,7 @@ import {
 import { headers } from "next/headers"
 import { z } from "zod"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import { ServiceError } from "@/lib/services/_lib/errors"
 import { withRLS, type Tx } from "@/lib/db/rls"
@@ -27,18 +28,18 @@ const baseClient = createSafeActionClient({
     })
   },
   handleServerError(error, utils) {
-    console.error(error, {
-      tags: {
-        actionName: utils.metadata?.actionName ?? "unknown",
-      },
-    })
-    if (process.env.NODE_ENV !== "production") {
-      console.error(
-        `[action:${utils.metadata?.actionName ?? "unknown"}]`,
-        error,
-      )
+    const actionName = utils.metadata?.actionName ?? "unknown"
+    // ActionError/ServiceError are user-facing (validation, auth, rate-limit)
+    // and don't deserve an error_logs row — they'd drown real signal.
+    const isExpected =
+      error instanceof ActionError || error instanceof ServiceError
+    if (!isExpected) {
+      logError(error, { source: `action:${actionName}` })
     }
-    if (error instanceof ActionError || error instanceof ServiceError) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error(`[action:${actionName}]`, error)
+    }
+    if (isExpected) {
       return error.message
     }
     return DEFAULT_SERVER_ERROR_MESSAGE
@@ -78,7 +79,7 @@ async function ratelimitKey(prefix: string): Promise<string> {
 // ─────────────────────────────────────────────────────────────────────────────
 // publicAction — no auth required. Validates input via Zod, applies the
 // generic API ratelimit (skipped when Upstash is unconfigured locally), and
-// logs errors via console.error.
+// records unexpected errors to `error_logs` via lib/audit/log.
 // ─────────────────────────────────────────────────────────────────────────────
 export const publicAction = baseClient.use(async ({ next, metadata }) => {
   if (apiRateLimit) {

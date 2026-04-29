@@ -14,6 +14,7 @@ import { archiveForm } from "@/lib/services/forms/archive"
 import { assignForm } from "@/lib/services/forms/assign"
 import { createForm } from "@/lib/services/forms/create"
 import { createPublicShare } from "@/lib/services/forms/create-public-share"
+import { exportFormResponses } from "@/lib/services/forms/export-responses"
 import { portalSubmitFormResponse } from "@/lib/services/forms/portal-submit-response"
 import { publicSubmitFormResponse } from "@/lib/services/forms/public-submit-response"
 import { revokePublicShare } from "@/lib/services/forms/revoke-public-share"
@@ -153,6 +154,13 @@ export const archiveFormAction = authedAction
     const result = await archiveForm(ctx, parsedInput)
     revalidatePath("/dashboard/forms")
     return result
+  })
+
+export const exportFormResponsesAction = authedAction
+  .metadata({ actionName: "forms.exportResponses" })
+  .inputSchema(z.object({ formId: z.string().uuid() }))
+  .action(async ({ parsedInput, ctx }) => {
+    return exportFormResponses(ctx, parsedInput)
   })
 
 export const assignFormAction = authedAction

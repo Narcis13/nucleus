@@ -2,6 +2,7 @@ import "server-only"
 
 import { and, eq } from "drizzle-orm"
 
+import { logError } from "@/lib/audit/log"
 import { dbAdmin } from "@/lib/db/client"
 import { deleteLeadMagnet as deleteLeadMagnetQuery } from "@/lib/db/queries/marketing"
 import { getProfessional } from "@/lib/db/queries/professionals"
@@ -42,7 +43,11 @@ export async function deleteLeadMagnet(
   try {
     await getSupabaseAdmin().storage.from(MARKETING_BUCKET).remove([row.fileKey])
   } catch (err) {
-    console.error(err, { tags: { action: "marketing.deleteLeadMagnet" } })
+    logError(err, {
+      source: "service:marketing.deleteLeadMagnet",
+      professionalId: professional.id,
+      metadata: { leadMagnetId: input.id },
+    })
   }
 
   const ok = await deleteLeadMagnetQuery(input.id)
